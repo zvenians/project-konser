@@ -33,6 +33,7 @@ try {
   await page.getByText("SIMULATED", { exact: false }).first().waitFor();
   const ticketLinks = page.getByRole("link", { name: /Unduh tiket demo/i });
   assert.equal(await ticketLinks.count(), 2);
+  const firstCode = await page.locator("[data-demo-ticket-code]").first().innerText();
 
   for (let index = 0; index < 2; index++) {
     const downloadPromise = page.waitForEvent("download");
@@ -48,7 +49,19 @@ try {
   const afterText = await page.locator(".picker-row").filter({ hasText: "Gold" }).first().innerText();
   const after = Number(afterText.match(/(\d+) tersedia/)?.[1]);
   assert.equal(after, before - 2);
-  console.log(JSON.stringify({ result: "venue-purchase-passed", before, after }));
+
+  await page.goto(`${base}/account`);
+  await page.getByRole("button", { name: "Keluar" }).click();
+  await page.goto(`${base}/login`);
+  await page.getByRole("button", { name: /Masuk sebagai Demo Administrator/i }).click();
+  await page.waitForURL("**/admin");
+  const checkin = page.locator("[data-demo-checkin]");
+  await checkin.locator('input[name="barcode"]').fill(firstCode);
+  await checkin.getByRole("button", { name: /Validasi check-in/i }).click();
+  await checkin.getByText(/Check-in berhasil/i).waitFor();
+  await checkin.getByRole("button", { name: /Validasi check-in/i }).click();
+  await checkin.getByText(/sudah digunakan/i).waitFor();
+  console.log(JSON.stringify({ result: "venue-purchase-and-checkin-passed", before, after }));
 } finally {
   await browser.close();
 }

@@ -16,6 +16,9 @@ import { settingValue } from "@/lib/settings";
 import { BatchImport } from "@/components/batch-import";
 import { getLocale } from "@/lib/i18n";
 import { secondaryMessages, secondaryStatus } from "@/lib/secondary-messages";
+import { demoModeEnabled } from "@/lib/demo-config";
+import { ensureDemoData } from "@/lib/demo-data";
+import { DemoCheckIn } from "@/components/demo-check-in";
 
 const money = (value: number | string) =>
   `Rp${Number(value).toLocaleString("id-ID")}`;
@@ -25,6 +28,8 @@ export default async function AdminPage({
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
   const locale = await getLocale();
+  const demo = demoModeEnabled();
+  if (demo) await ensureDemoData();
   const en = locale === "en";
   const t = secondaryMessages(locale).admin;
   const user = await currentUser();
@@ -286,13 +291,17 @@ export default async function AdminPage({
           <p>
             {checkins[0]?.total ?? 0} {t.ticketsCheckedIn}
           </p>
-          <form className="panel admin-form" action={checkInTicket}>
-            <label>
-              {t.barcodeQRFromOriginalPDF}
-              <input name="barcode" required minLength={3} />
-            </label>
-            <button type="submit">{t.validateCheckIn}</button>
-          </form>
+          {demo ? (
+            <DemoCheckIn locale={locale} />
+          ) : (
+            <form className="panel admin-form" action={checkInTicket}>
+              <label>
+                {t.barcodeQRFromOriginalPDF}
+                <input name="barcode" required minLength={3} />
+              </label>
+              <button type="submit">{t.validateCheckIn}</button>
+            </form>
+          )}
         </section>
       )}
       <section id="payments" className="dashboard-section">

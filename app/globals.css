@@ -72,6 +72,25 @@ body {
   margin: 0;
 }
 
+.demo-ticket-code {
+  display: block;
+  margin: 8px 0 14px;
+  overflow-wrap: anywhere;
+  color: #f7c94b;
+  font-size: 11px;
+}
+
+.demo-checkin-result {
+  margin: 12px 0 0;
+  font-weight: 700;
+}
+
+.checkin-camera {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 10px;
+}
+
 .demo-login-panel form {
   display: inline-block;
   margin: 10px 8px 0 0;

@@ -196,6 +196,11 @@ export default async function AccountPage({
                 <span className="eyebrow">SYMPHONY OF FAITH / VENUE</span>
                 <h3>{ticket.name}</h3>
                 <p>{t.eventDate} · Tiara Convention Hall, Medan</p>
+                {demo && (
+                  <code className="demo-ticket-code" data-demo-ticket-code>
+                    {ticket.barcode}
+                  </code>
+                )}
                 <a href={`/api/tickets/${ticket.id}`}>
                   {demo ? (en ? "Download demo ticket PDF" : "Unduh tiket demo PDF") : t.downloadOriginalPDF} ↗
                 </a>
