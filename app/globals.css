@@ -31,6 +31,49 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
+
+.demo-preview-bar {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 7px 18px;
+  background: #f7c94b;
+  color: #171719;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.demo-preview-bar strong {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.demo-login-panel {
+  grid-column: 1 / -1;
+}
+
+.demo-login-panel form {
+  display: inline-block;
+  margin: 10px 8px 0 0;
+}
+
+@media (max-width: 640px) {
+  .demo-preview-bar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+  }
+
+  .demo-login-panel form,
+  .demo-login-panel button {
+    display: block;
+    width: 100%;
+  }
+}
 button,
 input,
 select,

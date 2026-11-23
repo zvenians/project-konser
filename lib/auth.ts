@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
+import { demoModeEnabled } from "@/lib/demo-config";
 
 const digest = (token: string) =>
   createHash("sha256").update(token).digest("hex");
@@ -9,8 +10,9 @@ const digest = (token: string) =>
 export async function currentUser() {
   const token = (await cookies()).get("sof_session")?.value;
   if (!token || !process.env.DATABASE_URL) return null;
+  const demo = demoModeEnabled();
   const [user] =
-    await db()`SELECT u.id,u.name,u.email,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=${digest(token)} AND s.expires_at>now()`;
+    await db()`SELECT u.id,u.name,u.email,u.role,u.is_demo FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=${digest(token)} AND s.expires_at>now() AND u.is_demo=${demo}`;
   return user ?? null;
 }
 

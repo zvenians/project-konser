@@ -4,6 +4,7 @@ import "./globals.css";
 import "./concert.css";
 import { getLocale } from "@/lib/i18n";
 import { PublicNavigation } from "@/components/public-navigation";
+import { demoModeEnabled } from "@/lib/demo-config";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -30,9 +31,20 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Layout({ children }: { children: ReactNode }) {
   const locale = await getLocale();
+  const demo = demoModeEnabled();
   return (
     <html lang={locale}>
       <body>
+        {demo && (
+          <div className="demo-preview-bar" data-demo-preview>
+            <strong>Demo Preview</strong>
+            <span>
+              {locale === "id"
+                ? "Semua pembayaran, tiket, dan pesan di situs ini adalah simulasi."
+                : "All payments, tickets, and messages on this site are simulated."}
+            </span>
+          </div>
+        )}
         <PublicNavigation locale={locale} />
         {children}
       </body>

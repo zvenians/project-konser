@@ -13,6 +13,8 @@ import {
   requireFinance,
   requireUser,
 } from "@/lib/auth";
+import { demoModeEnabled, requireDemoMode } from "@/lib/demo-config";
+import { DEMO_ACCOUNTS, ensureDemoData } from "@/lib/demo-data";
 
 const credentials = z.object({
   email: z.email().max(254),
@@ -20,6 +22,7 @@ const credentials = z.object({
 });
 
 export async function register(form: FormData) {
+  const demo = demoModeEnabled();
   const values = credentials
     .extend({
       name: z.string().trim().min(2).max(100),
@@ -34,7 +37,7 @@ export async function register(form: FormData) {
     .parse(Object.fromEntries(form));
   const consent = form.get("whatsappConsent") === "on";
   const [user] =
-    await db()`INSERT INTO users(email,name,password_hash,phone,whatsapp_consent_at) VALUES (${values.email.toLowerCase()},${values.name},${await hash(values.password, 12)},${values.phone ?? null},${consent ? new Date() : null}) RETURNING id`;
+    await db()`INSERT INTO users(email,name,password_hash,phone,whatsapp_consent_at,is_demo) VALUES (${values.email.toLowerCase()},${values.name},${await hash(values.password, 12)},${values.phone ?? null},${consent ? new Date() : null},${demo}) RETURNING id`;
   await createSession(user.id);
   redirect(form.get("next") === "/checkout" ? "/checkout" : "/account");
 }
@@ -42,6 +45,7 @@ export async function register(form: FormData) {
 export async function login(form: FormData) {
   const values = credentials.parse(Object.fromEntries(form));
   const email = values.email.toLowerCase();
+  const demo = demoModeEnabled();
   const [attempt] =
     await db()`SELECT locked_until FROM login_attempts WHERE email=${email}`;
   if (
@@ -50,7 +54,7 @@ export async function login(form: FormData) {
   )
     throw new Error("Terlalu banyak percobaan. Coba lagi dalam 15 menit.");
   const [user] =
-    await db()`SELECT id,password_hash FROM users WHERE email=${email}`;
+    await db()`SELECT id,password_hash FROM users WHERE email=${email} AND is_demo=${demo}`;
   if (!user || !(await compare(values.password, user.password_hash))) {
     await db()`INSERT INTO login_attempts(email,attempts,window_started_at) VALUES (${email},1,now()) ON CONFLICT(email) DO UPDATE SET attempts=CASE WHEN login_attempts.window_started_at<now()-interval '15 minutes' THEN 1 ELSE login_attempts.attempts+1 END,window_started_at=CASE WHEN login_attempts.window_started_at<now()-interval '15 minutes' THEN now() ELSE login_attempts.window_started_at END,locked_until=CASE WHEN login_attempts.attempts>=9 AND login_attempts.window_started_at>=now()-interval '15 minutes' THEN now()+interval '15 minutes' ELSE NULL END`;
     throw new Error("Email atau kata sandi salah.");
@@ -58,6 +62,17 @@ export async function login(form: FormData) {
   await db()`DELETE FROM login_attempts WHERE email=${email}`;
   await createSession(user.id);
   redirect(form.get("next") === "/checkout" ? "/checkout" : "/account");
+}
+
+export async function demoLogin(form: FormData) {
+  requireDemoMode();
+  await ensureDemoData();
+  const role = z.enum(["customer", "admin", "finance"]).parse(form.get("role"));
+  const [user] = await db()`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS[role]} AND is_demo=true`;
+  if (!user) throw new Error("Akun demo tidak tersedia.");
+  await createSession(user.id);
+  const next = form.get("next");
+  redirect(role === "customer" && next === "/checkout" ? "/checkout" : role === "customer" ? "/account" : "/admin");
 }
 
 export async function logout() {

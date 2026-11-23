@@ -3,11 +3,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/migrate.mjs && next build",
     "lint": "eslint app components/batch-import.tsx components/cart-clearer.tsx components/checkout-cart.tsx components/event-motion.tsx components/public-navigation.tsx components/share-button.tsx components/ticket-picker.tsx lib",
     "format": "prettier --write app components/cart-clearer.tsx components/checkout-cart.tsx components/event-motion.tsx components/public-navigation.tsx components/share-button.tsx components/ticket-picker.tsx lib scripts tests",
     "start": "next start",
     "db:migrate": "node scripts/migrate.mjs",
+    "demo:seed": "node --experimental-strip-types scripts/seed-demo.mjs",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "admin:create": "node scripts/create-admin.mjs"
   },

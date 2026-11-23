@@ -14,6 +14,8 @@ import { db } from "@/lib/db";
 import { event, officialClasses } from "@/lib/event";
 import { getLocale, formatEventDate, translate } from "@/lib/i18n";
 import { settingValue } from "@/lib/settings";
+import { demoModeEnabled } from "@/lib/demo-config";
+import { ensureDemoData } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +75,12 @@ const messages = {
 };
 
 export default async function EventPage() {
+  const demo = demoModeEnabled();
+  if (demo) await ensureDemoData();
   const locale = await getLocale();
   const t = translate(locale, messages);
   const [classes, settings] = await Promise.all([
-    db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.sale_enabled,e.streaming_ready,count(t.id) FILTER(WHERE t.status='AVAILABLE')::integer AS available FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready ORDER BY c.price DESC`,
+    db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.sale_enabled,e.streaming_ready,count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS available FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready ORDER BY c.price DESC`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
   ]);
   const payment = settingValue<{
@@ -84,9 +88,8 @@ export default async function EventPage() {
     account: string;
     holder: string;
   }>(settings[0]?.value);
-  const paymentReady = Boolean(
-    payment?.bank && payment.account && payment.holder,
-  );
+  const paymentReady =
+    demo || Boolean(payment?.bank && payment.account && payment.holder);
   const options: TicketOption[] = (["VENUE", "LIVESTREAM"] as const).flatMap(
     (mode) =>
       officialClasses.map((item) => {
