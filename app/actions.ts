@@ -82,6 +82,7 @@ export async function logout() {
 
 export async function reserve(form: FormData) {
   const user = await requireUser();
+  const demo = demoModeEnabled();
   await expireReservations();
   const [instructions] =
     await db()`SELECT value FROM site_settings WHERE key='payment_instructions'`;
@@ -90,7 +91,7 @@ export async function reserve(form: FormData) {
     account: string;
     holder: string;
   }>(instructions?.value);
-  if (!payment?.bank || !payment.account || !payment.holder)
+  if (!demo && (!payment?.bank || !payment.account || !payment.holder))
     throw new Error("Pembayaran belum dibuka oleh penyelenggara.");
   const items = z
     .array(
@@ -138,7 +139,7 @@ export async function reserve(form: FormData) {
       let ticketIds: string[] = [];
       if (ticketClass.mode === "VENUE") {
         const rows =
-          await tx`SELECT id FROM ticket_inventory WHERE class_id=${item.classId} AND status='AVAILABLE' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT ${item.quantity}`;
+          await tx`SELECT id FROM ticket_inventory WHERE class_id=${item.classId} AND status='AVAILABLE' AND is_demo=${demo} ORDER BY id FOR UPDATE SKIP LOCKED LIMIT ${item.quantity}`;
         ticketIds = rows.map((row) => row.id);
         if (ticketIds.length !== item.quantity)
           throw new Error("Stok tiket terverifikasi tidak mencukupi.");
@@ -157,7 +158,7 @@ export async function reserve(form: FormData) {
       0,
     );
     const [order] =
-      await tx`INSERT INTO orders(user_id,idempotency_key,total,expires_at) VALUES (${user.id},${key},${total},now()+interval '24 hours') RETURNING id`;
+      await tx`INSERT INTO orders(user_id,idempotency_key,total,expires_at,is_demo) VALUES (${user.id},${key},${total},now()+interval '24 hours',${demo}) RETURNING id`;
     for (const item of prepared) {
       const [orderItem] =
         await tx`INSERT INTO order_items(order_id,class_id,quantity,unit_price) VALUES (${order.id},${item.classId},${item.quantity},${item.price}) RETURNING id`;
@@ -172,6 +173,51 @@ export async function reserve(form: FormData) {
     }
   });
   redirect("/account?reserved=1");
+}
+
+export async function simulateDemoPayment(form: FormData) {
+  requireDemoMode();
+  const user = await requireUser();
+  if (!user.is_demo) throw new Error("Akun ini bukan akun demo.");
+  const orderId = z.uuid().parse(form.get("orderId"));
+  const outcome = z.enum(["SUCCESS", "FAILED", "CANCELLED"]).parse(form.get("outcome"));
+  await db().begin(async (tx) => {
+    const [order] = await tx`SELECT id,user_id,status,total FROM orders WHERE id=${orderId} AND user_id=${user.id} AND is_demo=true FOR UPDATE`;
+    if (!order) throw new Error("Pesanan demo tidak ditemukan.");
+    const [existing] = await tx`SELECT outcome FROM demo_payments WHERE order_id=${orderId}`;
+    if (existing) {
+      if (existing.outcome !== outcome) throw new Error("Hasil pembayaran demo sudah ditetapkan.");
+      return;
+    }
+    if (order.status !== "PENDING") throw new Error("Pesanan demo sudah diproses.");
+    await tx`INSERT INTO demo_payments(order_id,outcome,receipt_label) VALUES (${orderId},${outcome},'SIMULATED')`;
+    if (outcome === "SUCCESS") {
+      await tx`UPDATE orders SET status='CONFIRMED' WHERE id=${orderId}`;
+      await tx`UPDATE ticket_inventory SET status='SOLD' WHERE is_demo=true AND id IN (SELECT a.ticket_id FROM ticket_allocations a JOIN order_items i ON i.id=a.item_id WHERE i.order_id=${orderId})`;
+      await tx`UPDATE stream_entitlements SET active=true WHERE order_id=${orderId}`;
+      const tickets = await tx`SELECT t.id,c.name FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN ticket_classes c ON c.id=i.class_id WHERE i.order_id=${orderId}`;
+      const message = {
+        simulated: true,
+        title: "Pembayaran demo berhasil",
+        body: `Pesanan #${String(orderId).slice(0, 8)} telah dikonfirmasi.`,
+        tickets: tickets.map((ticket) => ({
+          name: ticket.name,
+          url: `/api/tickets/${ticket.id}`,
+        })),
+      };
+      await tx`INSERT INTO notification_outbox(order_id,kind,status,user_id,recipient,demo_message) VALUES (${orderId},'PAYMENT_CONFIRMED','SIMULATED_DELIVERED',${user.id},'DEMO ONLY',${JSON.stringify(message)}::jsonb) ON CONFLICT(order_id,kind) DO NOTHING`;
+      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING','CONFIRMED')`;
+    } else {
+      const status = outcome === "FAILED" ? "FAILED" : "CANCELLED";
+      await tx`UPDATE orders SET status=${status} WHERE id=${orderId}`;
+      await tx`UPDATE ticket_inventory SET status='AVAILABLE' WHERE is_demo=true AND id IN (SELECT a.ticket_id FROM ticket_allocations a JOIN order_items i ON i.id=a.item_id WHERE i.order_id=${orderId})`;
+      await tx`DELETE FROM ticket_allocations WHERE item_id IN (SELECT id FROM order_items WHERE order_id=${orderId})`;
+      await tx`UPDATE stream_entitlements SET active=false WHERE order_id=${orderId}`;
+      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING',${status})`;
+    }
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${user.id},'DEMO_PAYMENT',${orderId},${JSON.stringify({ outcome, simulated: true })}::jsonb)`;
+  });
+  redirect(`/account?demoPayment=${outcome.toLowerCase()}`);
 }
 
 export async function releaseExpired() {

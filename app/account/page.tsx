@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { cancelOrder, logout, submitPayment } from "@/app/actions";
+import { cancelOrder, logout, simulateDemoPayment, submitPayment } from "@/app/actions";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Link from "next/link";
@@ -7,21 +7,26 @@ import { settingValue } from "@/lib/settings";
 import { getLocale } from "@/lib/i18n";
 import { secondaryMessages, secondaryStatus } from "@/lib/secondary-messages";
 import { CartClearer } from "@/components/cart-clearer";
+import { demoModeEnabled } from "@/lib/demo-config";
+import { ensureDemoData } from "@/lib/demo-data";
 
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reserved?: string }>;
+  searchParams: Promise<{ reserved?: string; demoPayment?: string }>;
 }) {
-  const reserved = (await searchParams).reserved === "1";
+  const params = await searchParams;
+  const reserved = params.reserved === "1";
+  const demo = demoModeEnabled();
+  if (demo) await ensureDemoData();
   const locale = await getLocale();
   const en = locale === "en";
   const t = secondaryMessages(locale).account;
   const user = await currentUser();
   if (!user) redirect("/login");
   const [orders, tickets, settings, stream] = await Promise.all([
-    db()`SELECT id,status,total,expires_at,created_at FROM orders WHERE user_id=${user.id} ORDER BY created_at DESC LIMIT 50`,
-    db()`SELECT t.id,c.name FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE o.user_id=${user.id} AND o.status='CONFIRMED' AND t.status='SOLD'`,
+    db()`SELECT o.id,o.status,o.total,o.expires_at,o.created_at,o.demo_historical,p.outcome,p.receipt_label FROM orders o LEFT JOIN demo_payments p ON p.order_id=o.id WHERE o.user_id=${user.id} AND o.is_demo=${demo} ORDER BY o.created_at DESC LIMIT 50`,
+    db()`SELECT t.id,c.name,t.barcode FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE o.user_id=${user.id} AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo}`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
     db()`SELECT count(*)::integer AS total FROM stream_entitlements WHERE user_id=${user.id} AND active=true`,
   ]);
@@ -33,6 +38,17 @@ export default async function AccountPage({
   return (
     <main className="dashboard wrap section">
       {reserved && <CartClearer />}
+      {demo && params.demoPayment && (
+        <div className="demo-result" role="status">
+          {params.demoPayment === "success"
+            ? en
+              ? "Simulated payment completed. Your demo tickets are ready."
+              : "Pembayaran simulasi berhasil. Tiket demo Anda sudah siap."
+            : en
+              ? `Simulated payment ${params.demoPayment}. Reserved stock was released.`
+              : `Pembayaran simulasi ${params.demoPayment}. Stok reservasi telah dilepas.`}
+        </div>
+      )}
       <div className="dashboard-head">
         <div>
           <p className="eyebrow">{t.accountLabel} / SYMPHONY OF FAITH</p>
@@ -88,6 +104,9 @@ export default async function AccountPage({
                   <p className="status">
                     {secondaryStatus(locale, String(order.status))}
                   </p>
+                  {demo && order.receipt_label && (
+                    <p className="demo-receipt">Receipt: {order.receipt_label} · {order.outcome}</p>
+                  )}
                   <small>
                     {t.created}{" "}
                     {new Date(order.created_at).toLocaleString(
@@ -114,7 +133,28 @@ export default async function AccountPage({
                     </form>
                   )}
                 </div>
-                {order.status === "PENDING" && payment && (
+                {order.status === "PENDING" && demo && (
+                  <div className="payment-box demo-payment-box">
+                    <strong>{en ? "Mock payment gateway" : "Gateway pembayaran simulasi"}</strong>
+                    <p>{en ? "No real money will be collected." : "Tidak ada uang nyata yang ditagihkan."}</p>
+                    <div className="demo-payment-actions">
+                      {(["SUCCESS", "FAILED", "CANCELLED"] as const).map((outcome) => (
+                        <form action={simulateDemoPayment} key={outcome}>
+                          <input type="hidden" name="orderId" value={order.id} />
+                          <input type="hidden" name="outcome" value={outcome} />
+                          <button className={outcome === "SUCCESS" ? "" : "secondary-button"} type="submit">
+                            {outcome === "SUCCESS"
+                              ? en ? "Pay Successfully" : "Bayar berhasil"
+                              : outcome === "FAILED"
+                                ? en ? "Simulate Failed Payment" : "Simulasikan pembayaran gagal"
+                                : en ? "Simulate Cancelled Payment" : "Simulasikan pembatalan"}
+                          </button>
+                        </form>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {order.status === "PENDING" && !demo && payment && (
                   <div className="payment-box">
                     <strong>
                       {t.transferTo} {payment.bank}
@@ -157,7 +197,7 @@ export default async function AccountPage({
                 <h3>{ticket.name}</h3>
                 <p>{t.eventDate} · Tiara Convention Hall, Medan</p>
                 <a href={`/api/tickets/${ticket.id}`}>
-                  {t.downloadOriginalPDF} ↗
+                  {demo ? (en ? "Download demo ticket PDF" : "Unduh tiket demo PDF") : t.downloadOriginalPDF} ↗
                 </a>
               </article>
             ))}

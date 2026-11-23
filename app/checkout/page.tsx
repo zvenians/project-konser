@@ -5,13 +5,17 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { settingValue } from "@/lib/settings";
+import { demoModeEnabled } from "@/lib/demo-config";
+import { ensureDemoData } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 export default async function CheckoutPage() {
+  const demo = demoModeEnabled();
+  if (demo) await ensureDemoData();
   const locale = await getLocale();
   const [user, classes, settings] = await Promise.all([
     currentUser(),
-    db()`SELECT c.id,c.name,c.mode,c.price,c.sale_enabled,e.streaming_ready,count(t.id) FILTER (WHERE t.status='AVAILABLE')::integer AS available FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready`,
+    db()`SELECT c.id,c.name,c.mode,c.price,c.sale_enabled,e.streaming_ready,count(t.id) FILTER (WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS available FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
   ]);
   const payment = settingValue<{
@@ -19,7 +23,7 @@ export default async function CheckoutPage() {
     account: string;
     holder: string;
   }>(settings[0]?.value);
-  const ready = Boolean(payment?.bank && payment.account && payment.holder);
+  const ready = demo || Boolean(payment?.bank && payment.account && payment.holder);
   const options = classes.map((row) => ({
     id: String(row.id),
     name: String(row.name),

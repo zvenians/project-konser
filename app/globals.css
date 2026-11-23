@@ -55,6 +55,23 @@ body {
   grid-column: 1 / -1;
 }
 
+.demo-result,
+.demo-receipt {
+  border: 1px solid rgba(247, 201, 75, 0.45);
+  background: rgba(247, 201, 75, 0.1);
+  padding: 12px 16px;
+}
+
+.demo-payment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.demo-payment-actions form {
+  margin: 0;
+}
+
 .demo-login-panel form {
   display: inline-block;
   margin: 10px 8px 0 0;

@@ -34,8 +34,13 @@ async function ensureAccounts() {
 
 export async function ensureDemoData() {
   requireDemoMode();
-  await ensureAccounts();
   const sql = db();
+  const [ready] = await sql`SELECT
+    (SELECT count(*) FROM ticket_inventory WHERE is_demo=true)=1850 AS inventory_ready,
+    (SELECT count(*) FROM users WHERE email = ANY(${Object.values(DEMO_ACCOUNTS)}) AND is_demo=true)=3 AS accounts_ready,
+    EXISTS(SELECT 1 FROM orders WHERE idempotency_key='00000000-0000-4000-8000-000000000027') AS history_ready`;
+  if (ready.inventory_ready && ready.accounts_ready && ready.history_ready) return;
+  await ensureAccounts();
   await sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(762027)`;
     await tx`UPDATE ticket_classes SET sale_enabled=true`;
