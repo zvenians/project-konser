@@ -1,0 +1,12 @@
+BEGIN;
+ALTER TABLE ticket_inventory ADD COLUMN IF NOT EXISTS verified_at timestamptz;
+ALTER TABLE ticket_inventory ADD COLUMN IF NOT EXISTS original_name text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_reference text UNIQUE;
+CREATE TABLE IF NOT EXISTS payment_events (provider text NOT NULL, event_id text NOT NULL, order_id uuid REFERENCES orders(id), received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(provider,event_id));
+CREATE TABLE IF NOT EXISTS notification_outbox (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid NOT NULL REFERENCES orders(id), kind text NOT NULL, status text NOT NULL DEFAULT 'QUEUED', attempts integer NOT NULL DEFAULT 0, next_attempt_at timestamptz NOT NULL DEFAULT now(), provider_id text, last_error text, UNIQUE(order_id,kind));
+CREATE TABLE IF NOT EXISTS ticket_status_history (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, ticket_id uuid NOT NULL REFERENCES ticket_inventory(id), actor_id uuid REFERENCES users(id), from_status text, to_status text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS order_status_history (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, order_id uuid NOT NULL REFERENCES orders(id), actor_id uuid REFERENCES users(id), from_status text, to_status text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS inventory_available ON ticket_inventory(class_id,status) WHERE status='AVAILABLE';
+CREATE INDEX IF NOT EXISTS orders_pending_expiry ON orders(expires_at) WHERE status='PENDING';
+INSERT INTO donation_campaigns(event_id,title,description) SELECT id,'Donasi Symphony of Faith','Kontribusi untuk konser amal' FROM events WHERE NOT EXISTS (SELECT 1 FROM donation_campaigns);
+COMMIT;

@@ -2,12 +2,13 @@ import { Countdown } from "@/components/countdown";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { event, officialClasses } from "@/lib/event";
+import Image from "next/image";
 
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
 export default function Concert() {
   return <>
-    <header className="wrap top"><a className="wordmark" href="#beranda">Symphony of Faith</a><nav aria-label="Navigasi utama"><a href="#tentang">Tentang</a><a href="#tiket">Tiket</a><a href="#donasi">Donasi</a><a href={event.instagram} target="_blank" rel="noopener noreferrer">Instagram</a></nav></header>
+    <header className="wrap top"><a className="wordmark" href="#beranda"><Image src="/brand/sof-gold-logo.png" alt="Symphony of Faith" width={120} height={60} /></a><nav aria-label="Navigasi utama"><a href="#tentang">Tentang</a><a href="#tiket">Tiket</a><a href="#donasi">Donasi</a><a href="/login">Masuk</a><a href={event.instagram} target="_blank" rel="noopener noreferrer">Instagram</a></nav></header>
     <main id="beranda">
       <section className="stage"><div className="wrap stage-inner"><p className="kicker">Charity Concert · Medan</p><h1>Symphony<br />of <em>Faith.</em></h1><p>Minggu, 7 Februari 2027 · 19.00–22.00 WIB</p><p>{event.venue}</p><p>Satu malam penuh musik, dengan tujuan yang lebih besar.</p><a className="stage-link" href="#tiket">Lihat tiket</a><Countdown /></div></section>
       <section className="wrap section split" id="tentang"><h2>Musik dan kepedulian</h2><p>Symphony of Faith adalah konser amal di Tiara Convention Hall, Medan. Informasi program charity akan dipublikasikan oleh penyelenggara.</p></section>

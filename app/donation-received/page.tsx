@@ -1,0 +1,1 @@
+export default function DonationReceived() { return <main className="wrap section"><h1>Niat donasi tercatat</h1><p>Donasi akan dihitung setelah diverifikasi oleh penyelenggara.</p><a href="/">Kembali ke beranda</a></main>; }

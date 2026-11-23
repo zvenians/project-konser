@@ -29,6 +29,9 @@ body { margin:0; background:var(--paper); color:var(--ink); font-family:"Figtree
 .stepper { gap:.5rem; }
 .giving { border-block:1px solid var(--line); }
 .panel input { width:100%; border:1px solid var(--line); border-radius:.35rem; min-height:44px; padding:.5rem; color:inherit; }
+.panel { display:grid; gap:1rem; }
+.panel label { display:grid; gap:.4rem; }
+.section form button { background:var(--ink); color:var(--paper); padding:.5rem 1rem; border-radius:.35rem; }
 button { min-height:44px; cursor:pointer; }
 button:disabled { cursor:not-allowed; }
 :is(a,button,input):focus-visible { outline:2px solid currentColor; outline-offset:3px; }
