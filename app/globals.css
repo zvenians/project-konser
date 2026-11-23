@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@fontsource-variable/figtree";
+@import "@fontsource-variable/jetbrains-mono";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "../styles/dens-ui.css";
