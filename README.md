@@ -6,8 +6,8 @@ Platform tiket dan donasi Symphony of Faith. Branch `codex/full-stack-platform` 
 
 1. `npm ci`
 2. Salin `.env.example` ke `.env.local`, lalu isi `DATABASE_URL` PostgreSQL dan `APP_URL`.
-3. `npm run db:migrate`
-4. Isi `ADMIN_EMAIL`, `ADMIN_NAME`, dan `ADMIN_PASSWORD`, lalu jalankan `npm run admin:create`.
+3. `node --env-file=.env.local scripts/migrate.mjs`
+4. Isi `ADMIN_EMAIL`, `ADMIN_NAME`, dan `ADMIN_PASSWORD` (minimal 16 karakter), lalu jalankan `node --env-file=.env.local scripts/create-admin.mjs`.
 5. `npm run dev`
 
 Variabel rahasia disimpan di `.env*.local` atau pengaturan environment Vercel. File tersebut diabaikan Git. Gunakan database terpisah untuk Preview dan pengujian. `scripts/prepare-preview-db.mjs` dapat menyiapkan database `sof_preview` atau `sof_test` pada server PostgreSQL yang sama; jalankan migrasi dengan `DATABASE_URL` yang sesuai.
@@ -28,4 +28,4 @@ Pembayaran saat ini memakai verifikasi transfer bank manual. Tidak ada payment g
 
 ## Verifikasi
 
-`npm run lint`, `npm test`, `npm run build`. Pengujian browser lokal: `node scripts/visual-check.mjs`; alur transaksi: `node scripts/e2e-check.mjs`; persaingan stok: `node scripts/concurrency-check.mjs`. Jalankan dua skrip transaksi hanya terhadap database pengujian terisolasi, bukan database production atau Preview.
+`npm run lint`, `npm test`, `npm run build`. Pengujian browser lokal: `node scripts/visual-check.mjs`; alur transaksi: `node --env-file=.env.test-db.local --env-file=.env.preview-admin.local --env-file=.env.preview-cron.local scripts/e2e-check.mjs`; persaingan stok: `node --env-file=.env.test-db.local scripts/concurrency-check.mjs`. Jalankan aplikasi dengan `APP_URL=http://localhost:3220` dan `DATABASE_URL` dari `sof_test` sebelum kedua skrip transaksi; skrip menolak database selain `sof_test`.
