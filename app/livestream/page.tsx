@@ -3,9 +3,12 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Countdown } from "@/components/countdown";
 import { settingValue } from "@/lib/settings";
+import { getLocale } from "@/lib/i18n";
+import { secondaryMessages } from "@/lib/secondary-messages";
 
 export const dynamic = "force-dynamic";
 export default async function LivestreamPage() {
+  const t = secondaryMessages(await getLocale()).livestream;
   const user = await currentUser();
   if (!user) redirect("/login");
   const [entitlement, setting] = await Promise.all([
@@ -19,22 +22,19 @@ export default async function LivestreamPage() {
   return (
     <main className="dashboard wrap section">
       <p className="eyebrow">SYMPHONY OF FAITH / LIVESTREAM</p>
-      <h1>Ikuti konser dari mana saja.</h1>
-      <p>7 Februari 2027 · 19.00–22.00 WIB</p>
+      <h1>{t.watchLiveFromAnywhere}</h1>
+      <p>{t.eventDate} · 19.00–22.00 WIB</p>
       <Countdown />
       {!allowed ? (
         <div className="empty">
-          <h2>Akses belum aktif</h2>
-          <p>
-            Halaman ini hanya tersedia untuk akun dengan tiket livestream yang
-            pembayarannya sudah diverifikasi.
-          </p>
-          <a href="/account">Lihat pesanan saya ↗</a>
+          <h2>{t.accessNotActive}</h2>
+          <p>{t.thisStreamIsAvailableToAccounts}</p>
+          <a href="/account">{t.viewMyOrders} ↗</a>
         </div>
       ) : stream?.state === "LIVE" && stream.videoId ? (
         <div className="stream-player">
           <iframe
-            title="Siaran Symphony of Faith"
+            title={t.symphonyOfFaithLivestream}
             src={`https://www.youtube-nocookie.com/embed/${stream.videoId}`}
             allow="autoplay; encrypted-media; picture-in-picture"
             allowFullScreen
@@ -44,17 +44,12 @@ export default async function LivestreamPage() {
       ) : (
         <div className="empty">
           <h2>
-            {stream?.state === "ENDED"
-              ? "Siaran telah berakhir"
-              : "Siaran belum dimulai"}
+            {stream?.state === "ENDED" ? t.streamEnded : t.streamNotStarted}
           </h2>
-          <p>
-            Akses Anda aktif. Pemutar akan muncul ketika penyelenggara memulai
-            siaran.
-          </p>
+          <p>{t.yourAccessIsActiveThePlayer}</p>
         </div>
       )}
-      <a href="/account">← Kembali ke akun</a>
+      <a href="/account">← {t.backToAccount}</a>
     </main>
   );
 }

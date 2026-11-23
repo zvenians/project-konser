@@ -1,26 +1,39 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import "./globals.css";
 import "./concert.css";
-import { ThemePreference } from "@/components/theme-preference";
+import { getLocale } from "@/lib/i18n";
+import { PublicNavigation } from "@/components/public-navigation";
 
-export const metadata = {
-  metadataBase: new URL("https://symphonyoffaith.vercel.app"),
-  title: "Symphony of Faith — Charity Concert Medan 2027",
-  description:
-    "Konser amal Symphony of Faith, Minggu 7 Februari 2027 di Tiara Convention Hall, Medan. Informasi tiket venue dan livestream resmi.",
-  openGraph: {
-    title: "Symphony of Faith — Charity Concert Medan 2027",
-    description: "Satu malam musik, iman, dan kepedulian di Medan.",
-    type: "website" as const,
-    images: ["/brand/sof-gold-logo.png"],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const title =
+    locale === "id"
+      ? "Symphony of Faith — Konser Amal Medan 2027"
+      : "Symphony of Faith — Charity Concert Medan 2027";
+  const description =
+    locale === "id"
+      ? "7 Februari 2027, 19:00–22:00 WIB di Tiara Convention Hall, Medan. Tiket venue dan livestream resmi."
+      : "February 7, 2027, 19:00–22:00 WIB at Tiara Convention Hall, Medan. Official venue and livestream tickets.";
+  return {
+    metadataBase: new URL("https://symphonyoffaith.vercel.app"),
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      images: ["/brand/sof-gold-logo.png"],
+    },
+  };
+}
 
-export default function Layout({ children }: { children: ReactNode }) {
+export default async function Layout({ children }: { children: ReactNode }) {
+  const locale = await getLocale();
   return (
-    <html lang="id" suppressHydrationWarning>
+    <html lang={locale}>
       <body>
-        <ThemePreference />
+        <PublicNavigation locale={locale} />
         {children}
       </body>
     </html>

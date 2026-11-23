@@ -14,15 +14,19 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { settingValue } from "@/lib/settings";
 import { BatchImport } from "@/components/batch-import";
+import { getLocale } from "@/lib/i18n";
+import { secondaryMessages, secondaryStatus } from "@/lib/secondary-messages";
 
 const money = (value: number | string) =>
   `Rp${Number(value).toLocaleString("id-ID")}`;
-
 export default async function AdminPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
+  const locale = await getLocale();
+  const en = locale === "en";
+  const t = secondaryMessages(locale).admin;
   const user = await currentUser();
   if (!user || !["ADMIN", "FINANCE"].includes(user.role)) redirect("/login");
   const params = await searchParams;
@@ -75,37 +79,37 @@ export default async function AdminPage({
     <main className="dashboard wrap section">
       <div className="dashboard-head">
         <div>
-          <p className="eyebrow">OPERASIONAL / SYMPHONY OF FAITH</p>
-          <h1>Pusat pengelolaan</h1>
-          <p>Data transaksi dan inventaris dari database.</p>
+          <p className="eyebrow">{t.operationsLabel} / SYMPHONY OF FAITH</p>
+          <h1>{t.adminDashboard}</h1>
+          <p>{t.transactionsAndInventoryFromTheDatabase}</p>
         </div>
-        <a href="/account">Akun saya ↗</a>
+        <a href="/account">{t.myAccount} ↗</a>
       </div>
-      <nav className="admin-nav" aria-label="Modul admin">
-        <a href="#overview">Ringkasan</a>
-        <a href="#inventory">Inventaris</a>
+      <nav className="admin-nav" aria-label={t.adminSections}>
+        <a href="#overview">{t.overview}</a>
+        <a href="#inventory">{t.inventory}</a>
         <a href="#checkin">Check-in</a>
-        <a href="#payments">Pembayaran</a>
-        <a href="#donations">Donasi</a>
-        <a href="#notifications">Notifikasi</a>
+        <a href="#payments">{t.payments}</a>
+        <a href="#donations">{t.donations}</a>
+        <a href="#notifications">{t.notifications}</a>
         <a href="#stream">Livestream</a>
-        <a href="#settings">Pengaturan</a>
-        {user.role === "ADMIN" && <a href="#users">Pengguna</a>}
+        <a href="#settings">{t.settings}</a>
+        {user.role === "ADMIN" && <a href="#users">{t.users}</a>}
       </nav>
       <section id="overview" className="dashboard-section">
         <p className="eyebrow">01 / OVERVIEW</p>
-        <h2>Ringkasan langsung</h2>
+        <h2>{t.liveOverview}</h2>
         <div className="metric-grid">
           <div>
-            <span>Pesanan terkonfirmasi</span>
+            <span>{t.confirmedOrders}</span>
             <strong>{summary[0]?.confirmed ?? 0}</strong>
           </div>
           <div>
-            <span>Menunggu verifikasi</span>
+            <span>{t.awaitingReview}</span>
             <strong>{summary[0]?.reviewing ?? 0}</strong>
           </div>
           <div>
-            <span>Donasi terverifikasi</span>
+            <span>{t.verifiedDonations}</span>
             <strong>
               {money(
                 donations.find((d) => d.status === "VERIFIED")?.total ?? 0,
@@ -113,28 +117,27 @@ export default async function AdminPage({
             </strong>
           </div>
         </div>
-        <p className="hint">
-          Daftar pesanan memuat 100 transaksi terbaru. Statistik dihitung dari
-          seluruh transaksi.
-        </p>
+        <p className="hint">{t.ordersShowTheLatest100Transactions}</p>
         <div className="report-links">
-          <a href="/api/admin/reports?kind=orders">Ekspor pesanan CSV ↗</a>
-          <a href="/api/admin/reports?kind=donations">Ekspor donasi CSV ↗</a>
+          <a href="/api/admin/reports?kind=orders">{t.exportOrdersCSV} ↗</a>
+          <a href="/api/admin/reports?kind=donations">
+            {t.exportDonationsCSV} ↗
+          </a>
         </div>
       </section>
       <section id="inventory" className="dashboard-section">
         <p className="eyebrow">02 / INVENTORY</p>
-        <h2>Kelas & tiket asli</h2>
+        <h2>{t.ticketClassesOriginals}</h2>
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
-                <th>Kelas</th>
-                <th>Kapasitas</th>
-                <th>Tersedia</th>
-                <th>Dipesan</th>
-                <th>Terjual</th>
-                <th>Penjualan</th>
+                <th>{t.class}</th>
+                <th>{t.capacity}</th>
+                <th>{t.available}</th>
+                <th>{t.reserved}</th>
+                <th>{t.sold}</th>
+                <th>{t.sales}</th>
               </tr>
             </thead>
             <tbody>
@@ -157,13 +160,13 @@ export default async function AdminPage({
                           value={row.sale_enabled ? "false" : "true"}
                         />
                         <button type="submit" className="secondary-button">
-                          {row.sale_enabled ? "Tutup" : "Buka"}
+                          {row.sale_enabled ? t.closeSales : t.openSales}
                         </button>
                       </form>
                     ) : row.sale_enabled ? (
-                      "Buka"
+                      t.openSales
                     ) : (
-                      "Tutup"
+                      t.closedSales
                     )}
                   </td>
                 </tr>
@@ -178,18 +181,18 @@ export default async function AdminPage({
                 .filter((row) => row.mode === "VENUE")
                 .map((row) => ({ id: String(row.id), name: String(row.name) }))}
             />
-            <h3>Riwayat impor terbaru</h3>
+            <h3>{t.recentImports}</h3>
             {batches.length === 0 ? (
-              <p className="empty">Belum ada impor PDF.</p>
+              <p className="empty">{t.noPDFImportsYet}</p>
             ) : (
               <div className="table-scroll">
                 <table>
                   <thead>
                     <tr>
                       <th>Batch</th>
-                      <th>Waktu</th>
+                      <th>{t.time}</th>
                       <th>PDF</th>
-                      <th>Perlu review</th>
+                      <th>{t.needsReview}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -197,9 +200,12 @@ export default async function AdminPage({
                       <tr key={batch.id}>
                         <td>{String(batch.id).slice(0, 8)}</td>
                         <td>
-                          {new Date(batch.created_at).toLocaleString("id-ID", {
-                            timeZone: "Asia/Jakarta",
-                          })}{" "}
+                          {new Date(batch.created_at).toLocaleString(
+                            en ? "en-US" : "id-ID",
+                            {
+                              timeZone: "Asia/Jakarta",
+                            },
+                          )}{" "}
                           WIB
                         </td>
                         <td>{batch.total}</td>
@@ -216,13 +222,10 @@ export default async function AdminPage({
               method="post"
               encType="multipart/form-data"
             >
-              <h3>Impor PDF individual</h3>
-              <p>
-                Gunakan kode dari manifest penerbit. PDF menunggu review sebelum
-                tersedia untuk dijual.
-              </p>
+              <h3>{t.importASinglePDF}</h3>
+              <p>{t.useTheIssuerSManifestCode}</p>
               <label>
-                Kelas venue
+                {t.venueClass}
                 <select name="classId" required>
                   {stock
                     .filter((row) => row.mode === "VENUE")
@@ -234,11 +237,11 @@ export default async function AdminPage({
                 </select>
               </label>
               <label>
-                Kode QR/barcode manifest
+                {t.manifestQRBarcode}
                 <input name="barcode" required />
               </label>
               <label>
-                PDF asli
+                {t.originalPDF}
                 <input
                   type="file"
                   name="file"
@@ -246,11 +249,13 @@ export default async function AdminPage({
                   required
                 />
               </label>
-              <button type="submit">Unggah untuk review</button>
+              <button type="submit">{t.uploadForReview}</button>
             </form>
-            <h3>Perlu review ({review.length})</h3>
+            <h3>
+              {t.needsReview} ({review.length})
+            </h3>
             {review.length === 0 ? (
-              <p className="empty">Belum ada PDF menunggu review.</p>
+              <p className="empty">{t.noPDFsAwaitingReview}</p>
             ) : (
               <div className="record-list">
                 {review.map((row) => (
@@ -259,11 +264,13 @@ export default async function AdminPage({
                       <strong>
                         {row.name} · {row.original_name}
                       </strong>
-                      <p>Kode: {row.barcode}</p>
+                      <p>
+                        {t.code}: {row.barcode}
+                      </p>
                     </div>
                     <form action={verifyTicket}>
                       <input type="hidden" name="ticketId" value={row.id} />
-                      <button type="submit">Setujui sesuai manifest</button>
+                      <button type="submit">{t.approveAgainstManifest}</button>
                     </form>
                   </div>
                 ))}
@@ -275,29 +282,31 @@ export default async function AdminPage({
       {user.role === "ADMIN" && (
         <section id="checkin" className="dashboard-section">
           <p className="eyebrow">ENTRY / VENUE</p>
-          <h2>Validasi tiket masuk</h2>
-          <p>{checkins[0]?.total ?? 0} tiket sudah digunakan untuk masuk.</p>
+          <h2>{t.checkInTickets}</h2>
+          <p>
+            {checkins[0]?.total ?? 0} {t.ticketsCheckedIn}
+          </p>
           <form className="panel admin-form" action={checkInTicket}>
             <label>
-              Kode barcode/QR dari PDF asli
+              {t.barcodeQRFromOriginalPDF}
               <input name="barcode" required minLength={3} />
             </label>
-            <button type="submit">Validasi & catat masuk</button>
+            <button type="submit">{t.validateCheckIn}</button>
           </form>
         </section>
       )}
       <section id="payments" className="dashboard-section">
         <p className="eyebrow">03 / PAYMENTS</p>
-        <h2>Pesanan & transfer</h2>
+        <h2>{t.ordersTransfers}</h2>
         <form className="order-filter" action="/admin" method="get">
           <label>
-            Cari nama, email, atau ID
+            {t.searchNameEmailOrID}
             <input name="q" defaultValue={q} />
           </label>
           <label>
             Status
             <select name="status" defaultValue={status}>
-              <option value="ALL">Semua</option>
+              <option value="ALL">{t.all}</option>
               {[
                 "PENDING",
                 "PAYMENT_REVIEW",
@@ -306,20 +315,20 @@ export default async function AdminPage({
                 "EXPIRED",
               ].map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {secondaryStatus(locale, value)}
                 </option>
               ))}
             </select>
           </label>
-          <button type="submit">Terapkan filter</button>
+          <button type="submit">{t.applyFilters}</button>
         </form>
         <form action={releaseExpired}>
           <button type="submit" className="secondary-button">
-            Lepaskan reservasi kedaluwarsa
+            {t.releaseExpiredBookings}
           </button>
         </form>
         {orders.length === 0 ? (
-          <p className="empty">Tidak ada pesanan sesuai filter.</p>
+          <p className="empty">{t.noOrdersMatchTheseFilters}</p>
         ) : (
           <div className="record-list">
             {orders.map((order) => (
@@ -330,28 +339,35 @@ export default async function AdminPage({
                   </strong>
                   <p>
                     {order.email} ·{" "}
-                    <span className="status">{order.status}</span>
+                    <span className="status">
+                      {secondaryStatus(locale, String(order.status))}
+                    </span>
                   </p>
                   <small>
-                    {order.id} · Berakhir{" "}
-                    {new Date(order.expires_at).toLocaleString("id-ID", {
-                      timeZone: "Asia/Jakarta",
-                    })}{" "}
+                    {order.id} · {t.expires}{" "}
+                    {new Date(order.expires_at).toLocaleString(
+                      en ? "en-US" : "id-ID",
+                      {
+                        timeZone: "Asia/Jakarta",
+                      },
+                    )}{" "}
                     WIB
                   </small>
                   {order.transfer_reference && (
-                    <p>Referensi pembeli: {order.transfer_reference}</p>
+                    <p>
+                      {t.customerReference}: {order.transfer_reference}
+                    </p>
                   )}
                 </div>
                 {order.status === "PAYMENT_REVIEW" && (
                   <form className="verify-form" action={confirmOrder}>
                     <input type="hidden" name="orderId" value={order.id} />
                     <label>
-                      Referensi mutasi bank
+                      {t.bankStatementReference}
                       <input name="bankReference" required minLength={4} />
                     </label>
                     <label>
-                      Jumlah di mutasi (Rp)
+                      {t.statementAmountRp}
                       <input
                         type="number"
                         name="receivedAmount"
@@ -361,9 +377,9 @@ export default async function AdminPage({
                     </label>
                     <label className="check">
                       <input type="checkbox" name="bankConfirmed" required />{" "}
-                      Sudah cocok dengan mutasi rekening
+                      {t.matchesTheBankStatement}
                     </label>
-                    <button type="submit">Verifikasi transfer</button>
+                    <button type="submit">{t.verifyTransfer}</button>
                   </form>
                 )}
               </div>
@@ -373,11 +389,11 @@ export default async function AdminPage({
       </section>
       <section id="donations" className="dashboard-section">
         <p className="eyebrow">04 / DONATIONS</p>
-        <h2>Donasi</h2>
+        <h2>{t.donations}</h2>
         <div className="metric-grid">
           {["PENDING", "VERIFIED", "EXPIRED"].map((status) => (
             <div key={status}>
-              <span>{status}</span>
+              <span>{secondaryStatus(locale, status)}</span>
               <strong>
                 {money(
                   donations.find((row) => row.status === status)?.total ?? 0,
@@ -387,7 +403,7 @@ export default async function AdminPage({
           ))}
         </div>
         {donationQueue.length === 0 ? (
-          <p className="empty">Tidak ada donasi menunggu verifikasi.</p>
+          <p className="empty">{t.noDonationsAwaitingReview}</p>
         ) : (
           <div className="record-list">
             {donationQueue.map((row) => (
@@ -396,16 +412,18 @@ export default async function AdminPage({
                   <strong>
                     {row.donor_name} · {money(row.amount)}
                   </strong>
-                  <p>Referensi pembeli: {row.payment_reference}</p>
+                  <p>
+                    {t.donorReference}: {row.payment_reference}
+                  </p>
                 </div>
                 <form className="verify-form" action={verifyDonation}>
                   <input type="hidden" name="donationId" value={row.id} />
                   <label>
-                    Referensi mutasi bank
+                    {t.bankStatementReference}
                     <input name="bankReference" required minLength={4} />
                   </label>
                   <label>
-                    Jumlah di mutasi (Rp)
+                    {t.statementAmountRp}
                     <input
                       type="number"
                       name="receivedAmount"
@@ -415,9 +433,9 @@ export default async function AdminPage({
                   </label>
                   <label className="check">
                     <input type="checkbox" name="bankConfirmed" required />{" "}
-                    Sudah cocok dengan mutasi rekening
+                    {t.matchesTheBankStatement}
                   </label>
-                  <button type="submit">Verifikasi donasi</button>
+                  <button type="submit">{t.verifyDonation}</button>
                 </form>
               </div>
             ))}
@@ -426,9 +444,9 @@ export default async function AdminPage({
       </section>
       <section id="notifications" className="dashboard-section">
         <p className="eyebrow">05 / NOTIFICATIONS</p>
-        <h2>Antrean WhatsApp</h2>
+        <h2>{t.whatsAppQueue}</h2>
         {notifications.length === 0 ? (
-          <p className="empty">Belum ada notifikasi.</p>
+          <p className="empty">{t.noNotificationsYet}</p>
         ) : (
           <ul>
             {notifications.map((row) => (
@@ -438,22 +456,16 @@ export default async function AdminPage({
             ))}
           </ul>
         )}
-        <p className="hint">
-          Pengiriman aktif hanya setelah kredensial WhatsApp resmi dan template
-          disiapkan.
-        </p>
+        <p className="hint">{t.sendingStartsOnceOfficialWhatsAppCredentials}</p>
       </section>
       {user.role === "ADMIN" && (
         <section id="stream" className="dashboard-section">
           <p className="eyebrow">06 / LIVESTREAM</p>
-          <h2>Kontrol siaran</h2>
-          <p>
-            Gunakan ID video YouTube resmi. Pemutar hanya diberikan kepada akun
-            yang memiliki hak akses terverifikasi.
-          </p>
+          <h2>{t.streamControls}</h2>
+          <p>{t.useTheOfficialYouTubeVideoID}</p>
           <form className="panel admin-form" action={configureStream}>
             <label>
-              ID video YouTube
+              {t.youTubeVideoID}
               <input
                 name="videoId"
                 defaultValue={stream?.videoId ?? ""}
@@ -468,26 +480,26 @@ export default async function AdminPage({
                 name="state"
                 defaultValue={stream?.state ?? "NOT_STARTED"}
               >
-                <option value="NOT_STARTED">Belum dimulai</option>
+                <option value="NOT_STARTED">{t.notStarted}</option>
                 <option value="LIVE">Live</option>
-                <option value="ENDED">Berakhir</option>
+                <option value="ENDED">{t.ended}</option>
               </select>
             </label>
-            <button type="submit">Simpan status siaran</button>
+            <button type="submit">{t.saveStreamStatus}</button>
           </form>
         </section>
       )}
       {user.role === "ADMIN" && (
         <section id="settings" className="dashboard-section">
           <p className="eyebrow">06 / SETTINGS</p>
-          <h2>Rekening pembayaran</h2>
+          <h2>{t.paymentAccount}</h2>
           <form className="panel admin-form" action={configurePayment}>
             <label>
               Bank
               <input name="bank" defaultValue={payment?.bank ?? ""} required />
             </label>
             <label>
-              Nomor rekening
+              {t.accountNumber}
               <input
                 name="account"
                 defaultValue={payment?.account ?? ""}
@@ -495,22 +507,22 @@ export default async function AdminPage({
               />
             </label>
             <label>
-              Atas nama
+              {t.accountHolder}
               <input
                 name="holder"
                 defaultValue={payment?.holder ?? ""}
                 required
               />
             </label>
-            <button type="submit">Simpan instruksi transfer</button>
+            <button type="submit">{t.saveTransferInstructions}</button>
           </form>
         </section>
       )}
       {user.role === "ADMIN" && (
         <section id="users" className="dashboard-section">
           <p className="eyebrow">07 / ACCESS</p>
-          <h2>Pengguna & peran</h2>
-          <p>50 akun terbaru. Perubahan peran dicatat di audit log.</p>
+          <h2>{t.usersRoles}</h2>
+          <p>{t.latest50AccountsRoleChangesAre}</p>
           <div className="record-list">
             {users.map((account) => (
               <div className="record" key={account.id}>
@@ -523,14 +535,14 @@ export default async function AdminPage({
                 <form className="verify-form" action={setUserRole}>
                   <input type="hidden" name="userId" value={account.id} />
                   <label>
-                    Peran
+                    {t.role}
                     <select name="role" defaultValue={account.role}>
                       <option value="CUSTOMER">Customer</option>
                       <option value="FINANCE">Finance</option>
                       <option value="ADMIN">Admin</option>
                     </select>
                   </label>
-                  <button type="submit">Simpan peran</button>
+                  <button type="submit">{t.saveRole}</button>
                 </form>
               </div>
             ))}

@@ -34,11 +34,13 @@ try {
       .fill(`ConcurrentPassword-${tag}-${i}`);
     await register.getByRole("button", { name: "Buat akun" }).click();
     await page.waitForURL("**/account");
+    await page.goto(base);
+    await page.getByRole("button", { name: "+ Platinum" }).click();
     await page
-      .locator("#booking label")
-      .filter({ hasText: "Hadir langsung · Platinum" })
-      .locator('input[type="number"]')
-      .fill("1");
+      .getByRole("link", { name: /Lanjut ke checkout/ })
+      .first()
+      .click();
+    await page.waitForURL("**/checkout");
     pages.push({ context, page });
   }
   await Promise.all(

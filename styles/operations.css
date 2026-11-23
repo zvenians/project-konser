@@ -1,0 +1,273 @@
+.dashboard {
+  min-height: 100vh;
+  min-width: 0;
+  overflow-x: clip;
+}
+.dashboard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--line);
+}
+.dashboard-head h1 {
+  margin: 0.5rem 0;
+}
+.dashboard-head h1 em {
+  color: #9b7e48;
+}
+.dashboard-head p {
+  color: var(--muted);
+}
+.dashboard-head > a {
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.admin-nav {
+  display: flex;
+  gap: 1.8rem;
+  overflow-x: auto;
+  padding: 1.3rem 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+.admin-nav a {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.dashboard-section {
+  padding-block: 3rem;
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: 1rem;
+}
+.dashboard-section h2 {
+  margin: 0.2rem 0 1.6rem;
+}
+.dashboard-section h3 {
+  margin: 1.5rem 0 0.5rem;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.metric-grid > div {
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.metric-grid span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.metric-grid strong {
+  font-size: clamp(1.5rem, 2.5vw, 2.6rem);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.table-scroll th,
+.table-scroll td {
+  min-width: 110px;
+  padding: 1rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+.table-scroll th {
+  font-weight: 800;
+}
+.admin-form {
+  max-width: 620px;
+  margin-top: 2rem;
+}
+.admin-form h3,
+.admin-form p {
+  margin: 0;
+}
+.record-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+.record {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 2rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.record h3 {
+  margin: 0.3rem 0;
+}
+.record p {
+  margin: 0.5rem 0;
+}
+.record small {
+  display: block;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.record .status {
+  color: #846c3e;
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.verify-form,
+.payment-box form {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 260px;
+  max-width: 380px;
+}
+.verify-form .check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+}
+.verify-form .check input {
+  width: 18px;
+  height: 18px;
+}
+.payment-box {
+  max-width: 370px;
+  padding: 1.2rem;
+  background: #2c2c2e;
+  border-radius: 8px;
+}
+.payment-box p {
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.ticket-collection {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+.ticket-item {
+  padding: 2rem;
+  background: var(--forest);
+  color: var(--ivory);
+}
+.ticket-item .eyebrow {
+  color: var(--gold);
+}
+.ticket-item h3 {
+  font-size: 2rem;
+  margin: 1rem 0;
+}
+.ticket-item a {
+  display: inline-block;
+  margin-top: 1rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--gold);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.account-metrics {
+  margin-top: 2rem;
+}
+.report-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.report-links a {
+  display: inline-flex;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.order-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.order-filter label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.order-filter input,
+.order-filter select {
+  min-height: 44px;
+  min-width: 220px;
+  padding: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.order-filter button {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  background: var(--forest);
+  color: var(--ivory);
+  border: 0;
+}
+.stream-player {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  margin: 2rem 0;
+  background: #111;
+}
+@media (max-width: 700px) {
+  .dashboard-head {
+    align-items: start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+  .metric-grid > div {
+    gap: 6px;
+    padding: 16px;
+  }
+  .record {
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+  }
+  .verify-form,
+  .payment-box form {
+    min-width: 0;
+    width: 100%;
+  }
+  .ticket-collection {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-section {
+    min-width: 0;
+    padding-block: 34px;
+  }
+}
+.stream-player iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}

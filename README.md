@@ -14,6 +14,7 @@ Variabel rahasia disimpan di `.env*.local` atau pengaturan environment Vercel. F
 
 ## Operasi tiket
 
+- Pembeli memilih jumlah tiket langsung di halaman acara. Keranjang disimpan di browser sehingga pilihan bertahan saat berpindah ke checkout, login, atau mengganti bahasa ID/EN. Server menghitung ulang harga dan stok ketika reservasi dibuat.
 - Kategori dan kapasitas resmi tersimpan pada migrasi. Admin mengaktifkan penjualan dan mengatur rekening penerima dari dashboard setelah rekening resmi tersedia.
 - Pembeli membuat reservasi, lalu mengirim referensi transfer. Admin atau finance memverifikasi jumlah dan referensi terhadap mutasi bank sebelum tiket diterbitkan. Referensi yang sama tidak dapat digunakan dua kali.
 - Reservasi kedaluwarsa dilepas oleh endpoint `/api/cron/expire` dengan `CRON_SECRET`. Vercel Cron dikonfigurasi harian; pada Preview, jalankan endpoint secara manual karena jadwal otomatis hanya berjalan di production. Aksi reservasi dan admin juga memproses kedaluwarsa.
@@ -28,4 +29,4 @@ Pembayaran saat ini memakai verifikasi transfer bank manual. Tidak ada payment g
 
 ## Verifikasi
 
-`npm run lint`, `npm test`, `npm run build`. Pengujian browser lokal: `node scripts/visual-check.mjs`; alur transaksi: `node --env-file=.env.test-db.local --env-file=.env.preview-admin.local --env-file=.env.preview-cron.local scripts/e2e-check.mjs`; persaingan stok: `node --env-file=.env.test-db.local scripts/concurrency-check.mjs`. Jalankan aplikasi dengan `APP_URL=http://localhost:3220` dan `DATABASE_URL` dari `sof_test` sebelum kedua skrip transaksi; skrip menolak database selain `sof_test`.
+`npm run lint`, `npm test`, `npm run build`. Pengujian browser lokal: `node scripts/visual-check.mjs`; keranjang dan bahasa: `node --env-file=.env.test-db.local scripts/cart-language-check.mjs`; alur transaksi: `node --env-file=.env.test-db.local --env-file=.env.preview-admin.local --env-file=.env.preview-cron.local scripts/e2e-check.mjs`; persaingan stok: `node --env-file=.env.test-db.local scripts/concurrency-check.mjs`. Jalankan aplikasi dengan `APP_URL=http://localhost:3220` dan `DATABASE_URL` dari `sof_test` sebelum skrip transaksi; skrip tersebut menolak database selain `sof_test`. Catatan pengamatan referensi ada di `docs/shotgun-reference.md`.

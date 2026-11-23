@@ -1,63 +1,92 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
+import type { Locale } from "@/lib/i18n";
 
-const links = [
-  { href: "#tentang", label: "Tentang" },
-  { href: "#pengalaman", label: "Pengalaman" },
-  { href: "#tiket", label: "Tiket" },
-  { href: "#donasi", label: "Donasi" },
-];
-
-export function PublicNavigation() {
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const update = () => setScrolled(window.scrollY > 24);
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
-  }, []);
+export function LanguageSwitcher({ locale }: { locale: Locale }) {
   return (
-    <header className={`public-header ${scrolled ? "is-scrolled" : ""}`}>
-      <div className="wrap nav-inner">
-        <a
-          href="#beranda"
-          aria-label="Symphony of Faith, beranda"
-          onClick={() => setOpen(false)}
+    <div
+      className="language-switch"
+      aria-label={locale === "id" ? "Bahasa" : "Language"}
+    >
+      {(["id", "en"] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          aria-current={locale === value ? "true" : undefined}
+          onClick={() => {
+            document.cookie = `sof_locale=${value}; path=/; max-age=31536000; samesite=lax`;
+            window.location.reload();
+          }}
         >
+          {value.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function PublicNavigation({ locale = "id" }: { locale?: Locale }) {
+  const [open, setOpen] = useState(false);
+  const links = [
+    { href: "/#tickets", label: locale === "id" ? "Tiket" : "Tickets" },
+    {
+      href: "/#information",
+      label: locale === "id" ? "Informasi" : "Information",
+    },
+    { href: "/#venue", label: locale === "id" ? "Lokasi" : "Venue" },
+  ];
+  return (
+    <header className="event-nav">
+      <div className="event-nav-inner">
+        <Link href="/" className="event-brand" aria-label="Symphony of Faith">
           <Image
             src="/brand/sof-gold-logo.png"
             alt=""
-            width={116}
-            height={58}
+            width={52}
+            height={52}
             priority
           />
-        </a>
-        <nav className="desktop-nav" aria-label="Navigasi utama">
+          <span>Symphony of Faith</span>
+        </Link>
+        <nav
+          className="event-nav-links"
+          aria-label={locale === "id" ? "Navigasi utama" : "Main navigation"}
+        >
           {links.map((link) => (
-            <a href={link.href} key={link.href}>
+            <Link key={link.href} href={link.href}>
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
-        <div className="nav-actions">
-          <a className="account-link" href="/account">
-            Akun
-          </a>
-          <a className="nav-ticket" href="#tiket">
-            Lihat tiket <span aria-hidden>↗</span>
-          </a>
+        <div className="event-nav-actions">
+          <LanguageSwitcher locale={locale} />
+          <Link className="nav-account" href="/account">
+            {locale === "id" ? "Akun" : "Account"}
+          </Link>
+          <Link className="nav-buy" href="/#tickets">
+            {locale === "id" ? "Beli tiket" : "Get tickets"}
+          </Link>
           <button
-            className="menu-toggle"
+            className="nav-menu-button"
             type="button"
-            aria-label={open ? "Tutup menu" : "Buka menu"}
             aria-expanded={open}
-            aria-controls="mobile-nav"
+            aria-controls="event-mobile-nav"
+            aria-label={
+              open
+                ? locale === "id"
+                  ? "Tutup menu"
+                  : "Close menu"
+                : locale === "id"
+                  ? "Buka menu"
+                  : "Open menu"
+            }
             onClick={() => setOpen(!open)}
           >
+            <span />
             <span />
             <span />
           </button>
@@ -66,23 +95,26 @@ export function PublicNavigation() {
       <AnimatePresence>
         {open && (
           <motion.nav
-            id="mobile-nav"
-            className="mobile-nav"
-            aria-label="Navigasi seluler"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
+            id="event-mobile-nav"
+            className="event-mobile-nav"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
           >
             {links.map((link) => (
-              <a
+              <Link
                 href={link.href}
                 key={link.href}
                 onClick={() => setOpen(false)}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
-            <a href="/account">Akun saya</a>
+            <Link href="/account">
+              {locale === "id" ? "Akun saya" : "My account"}
+            </Link>
+            <LanguageSwitcher locale={locale} />
           </motion.nav>
         )}
       </AnimatePresence>

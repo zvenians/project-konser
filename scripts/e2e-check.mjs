@@ -14,6 +14,29 @@ const browser = await chromium.launch({
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   headless: true,
 });
+async function waitForStatus(table, id, expected) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const [record] = await sql.unsafe(
+      `SELECT status FROM ${table} WHERE id=$1`,
+      [id],
+    );
+    if (record?.status === expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  const [record] = await sql.unsafe(`SELECT status FROM ${table} WHERE id=$1`, [
+    id,
+  ]);
+  assert.equal(record?.status, expected);
+}
+async function waitForOrder(email, total) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const [order] =
+      await sql`SELECT o.id,o.status FROM orders o JOIN users u ON u.id=o.user_id WHERE u.email=${email} AND o.total=${total} ORDER BY o.created_at DESC LIMIT 1`;
+    if (order) return order;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(`Order ${total} not created`);
+}
 const id = randomUUID().slice(0, 8);
 const screenshots = path.join(process.cwd(), "artifacts", "screenshots");
 await fs.mkdir(screenshots, { recursive: true });
@@ -107,15 +130,17 @@ try {
     { multipart: {} },
   );
   assert.equal(unauthorizedImport.status(), 403);
-  assert.match(await customer.locator("#booking").innerText(), /Reguler/);
-  const ticket = customer
-    .locator("#booking label")
-    .filter({ hasText: "Livestream · Reguler" });
-  await ticket.locator('input[type="number"]').fill("1");
+  await customer.goto(base);
+  await customer.getByRole("tab", { name: "Livestream" }).click();
+  await customer.getByRole("button", { name: "+ Reguler" }).click();
+  await customer
+    .getByRole("link", { name: /Lanjut ke checkout/ })
+    .first()
+    .click();
+  await customer.waitForURL("**/checkout");
   await customer.getByRole("button", { name: "Buat reservasi" }).click();
-  await customer.waitForLoadState("networkidle");
-  await customer.reload({ waitUntil: "networkidle" });
-  assert.match(await customer.locator("#orders").innerText(), /PENDING/);
+  await customer.waitForURL("**/account?reserved=1");
+  assert.match(await customer.locator("#orders").innerText(), /Menunggu/);
   await customer.screenshot({
     path: path.join(screenshots, "checkout-desktop.png"),
     fullPage: true,
@@ -144,10 +169,7 @@ try {
   await verify.locator('[name="bankConfirmed"]').check();
   await verify.getByRole("button", { name: "Verifikasi transfer" }).click();
   await admin.waitForLoadState("networkidle");
-  assert.equal(
-    (await sql`SELECT status FROM orders WHERE id=${order.id}`)[0].status,
-    "CONFIRMED",
-  );
+  await waitForStatus("orders", order.id, "CONFIRMED");
   assert.equal(
     (
       await sql`SELECT active FROM stream_entitlements WHERE order_id=${order.id}`
@@ -187,10 +209,7 @@ try {
     .getByRole("button", { name: "Verifikasi donasi" })
     .click();
   await admin.waitForLoadState("networkidle");
-  assert.equal(
-    (await sql`SELECT status FROM donations WHERE id=${donation.id}`)[0].status,
-    "VERIFIED",
-  );
+  await waitForStatus("donations", donation.id, "VERIFIED");
   const [adminUser] =
     await sql`SELECT id FROM users WHERE email=${process.env.ADMIN_EMAIL}`;
   await assert.rejects(
@@ -202,16 +221,16 @@ try {
   const [venueTicket] =
     await sql`INSERT INTO ticket_inventory(class_id,file_key,file_hash,barcode,status,verified_at) VALUES (${venueClass.id},${`test/${id}.pdf`},${randomUUID().replaceAll("-", "").padEnd(64, "0")},${venueBarcode},'AVAILABLE',now()) RETURNING id`;
   await sql`UPDATE ticket_classes SET sale_enabled=true WHERE id=${venueClass.id}`;
-  await customer.goto(`${base}/account`);
+  await customer.goto(base);
+  await customer.getByRole("button", { name: "+ Platinum" }).click();
   await customer
-    .locator("#booking label")
-    .filter({ hasText: "Hadir langsung · Platinum" })
-    .locator('input[type="number"]')
-    .fill("1");
+    .getByRole("link", { name: /Lanjut ke checkout/ })
+    .first()
+    .click();
+  await customer.waitForURL("**/checkout");
   await customer.getByRole("button", { name: "Buat reservasi" }).click();
-  await customer.waitForLoadState("networkidle");
-  const [venueOrder] =
-    await sql`SELECT o.id,o.status FROM orders o JOIN users u ON u.id=o.user_id WHERE u.email=${email} AND o.total=2000000 ORDER BY o.created_at DESC LIMIT 1`;
+  await customer.waitForURL("**/account?reserved=1");
+  const venueOrder = await waitForOrder(email, 2000000);
   assert.equal(venueOrder.status, "PENDING");
   await customer.goto(`${base}/account`);
   const venueClaim = customer.locator("article.record").filter({
@@ -231,6 +250,7 @@ try {
     .getByRole("button", { name: "Verifikasi transfer" })
     .click();
   await admin.waitForLoadState("networkidle");
+  await waitForStatus("orders", venueOrder.id, "CONFIRMED");
   assert.equal(
     (
       await sql`SELECT status FROM ticket_inventory WHERE id=${venueTicket.id}`

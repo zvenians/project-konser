@@ -4,8 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "eslint app components/batch-import.tsx components/booking-form.tsx components/editorial-motion.tsx components/public-navigation.tsx components/theme-preference.tsx lib",
-    "format": "prettier --write app components/editorial-motion.tsx components/public-navigation.tsx components/theme-preference.tsx lib scripts tests",
+    "lint": "eslint app components/batch-import.tsx components/cart-clearer.tsx components/checkout-cart.tsx components/event-motion.tsx components/public-navigation.tsx components/share-button.tsx components/ticket-picker.tsx lib",
+    "format": "prettier --write app components/cart-clearer.tsx components/checkout-cart.tsx components/event-motion.tsx components/public-navigation.tsx components/share-button.tsx components/ticket-picker.tsx lib scripts tests",
     "start": "next start",
     "db:migrate": "node scripts/migrate.mjs",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",

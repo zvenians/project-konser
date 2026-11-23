@@ -36,7 +36,7 @@ export async function register(form: FormData) {
   const [user] =
     await db()`INSERT INTO users(email,name,password_hash,phone,whatsapp_consent_at) VALUES (${values.email.toLowerCase()},${values.name},${await hash(values.password, 12)},${values.phone ?? null},${consent ? new Date() : null}) RETURNING id`;
   await createSession(user.id);
-  redirect("/account");
+  redirect(form.get("next") === "/checkout" ? "/checkout" : "/account");
 }
 
 export async function login(form: FormData) {
@@ -57,7 +57,7 @@ export async function login(form: FormData) {
   }
   await db()`DELETE FROM login_attempts WHERE email=${email}`;
   await createSession(user.id);
-  redirect("/account");
+  redirect(form.get("next") === "/checkout" ? "/checkout" : "/account");
 }
 
 export async function logout() {
@@ -156,7 +156,7 @@ export async function reserve(form: FormData) {
       await tx`INSERT INTO ticket_allocations(ticket_id,item_id) VALUES (${allocation.ticketId},${allocation.itemId})`;
     }
   });
-  redirect("/account");
+  redirect("/account?reserved=1");
 }
 
 export async function releaseExpired() {

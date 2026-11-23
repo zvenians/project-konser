@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { getLocale } from "@/lib/i18n";
+import { secondaryMessages } from "@/lib/secondary-messages";
 
-export default function DonationReceived() {
+export default async function DonationReceived() {
+  const t = secondaryMessages(await getLocale()).donationReceived;
   return (
     <main className="wrap section">
-      <h1>Niat donasi tercatat</h1>
-      <p>Donasi akan dihitung setelah diverifikasi oleh penyelenggara.</p>
-      <Link href="/">Kembali ke beranda</Link>
+      <h1>{t.donationSubmitted}</h1>
+      <p>{t.yourDonationWillBeCountedAfter}</p>
+      <Link href="/">{t.backToHome}</Link>
     </main>
   );
 }
