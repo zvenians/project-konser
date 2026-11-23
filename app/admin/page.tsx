@@ -9,6 +9,7 @@ import {
   setUserRole,
   verifyDonation,
   verifyTicket,
+  setDemoStreamState,
 } from "@/app/actions";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -59,18 +60,18 @@ export default async function AdminPage({
     batches,
     users,
   ] = await Promise.all([
-    db()`SELECT c.id,c.name,c.mode,c.capacity,c.sale_enabled,count(t.id) FILTER(WHERE t.status='AVAILABLE') AS available,count(t.id) FILTER(WHERE t.status='RESERVED') AS reserved,count(t.id) FILTER(WHERE t.status='SOLD') AS sold FROM ticket_classes c LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id ORDER BY c.mode,c.price DESC`,
-    db()`SELECT o.id,o.status,o.total,o.expires_at,u.name,u.email,p.transfer_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE (${q}='' OR u.name ILIKE ${`%${q}%`} OR u.email ILIKE ${`%${q}%`} OR o.id::text ILIKE ${`%${q}%`}) AND (${status}='ALL' OR o.status=${status}) ORDER BY o.created_at DESC LIMIT 100`,
-    db()`SELECT status,count(*) AS count,coalesce(sum(amount),0) AS total FROM donations GROUP BY status`,
-    db()`SELECT t.id,c.name,t.barcode,t.original_name FROM ticket_inventory t JOIN ticket_classes c ON c.id=t.class_id WHERE t.status='NEEDS_REVIEW' ORDER BY t.id LIMIT 50`,
-    db()`SELECT id,donor_name,amount,payment_reference FROM donations WHERE status='PENDING' AND expires_at>now() ORDER BY created_at LIMIT 50`,
+    db()`SELECT c.id,c.name,c.mode,c.capacity,c.sale_enabled,count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo}) AS available,count(t.id) FILTER(WHERE t.status='RESERVED' AND t.is_demo=${demo}) AS reserved,count(t.id) FILTER(WHERE t.status='SOLD' AND t.is_demo=${demo}) AS sold FROM ticket_classes c LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id ORDER BY c.mode,c.price DESC`,
+    db()`SELECT o.id,o.status,o.total,o.expires_at,u.name,u.email,p.transfer_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} AND (${q}='' OR u.name ILIKE ${`%${q}%`} OR u.email ILIKE ${`%${q}%`} OR o.id::text ILIKE ${`%${q}%`}) AND (${status}='ALL' OR o.status=${status}) ORDER BY o.created_at DESC LIMIT 100`,
+    db()`SELECT status,count(*) AS count,coalesce(sum(amount),0) AS total FROM donations WHERE is_demo=${demo} GROUP BY status`,
+    db()`SELECT t.id,c.name,t.barcode,t.original_name FROM ticket_inventory t JOIN ticket_classes c ON c.id=t.class_id WHERE t.status='NEEDS_REVIEW' AND t.is_demo=${demo} ORDER BY t.id LIMIT 50`,
+    db()`SELECT id,donor_name,amount,payment_reference FROM donations WHERE status='PENDING' AND expires_at>now() AND is_demo=${demo} ORDER BY created_at LIMIT 50`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
-    db()`SELECT kind,status,count(*) AS count FROM notification_outbox GROUP BY kind,status`,
+    db()`SELECT n.kind,n.status,count(*) AS count FROM notification_outbox n JOIN orders o ON o.id=n.order_id WHERE o.is_demo=${demo} GROUP BY n.kind,n.status`,
     db()`SELECT value FROM site_settings WHERE key='stream'`,
-    db()`SELECT count(*) FILTER (WHERE status='CONFIRMED')::integer AS confirmed,count(*) FILTER (WHERE status='PAYMENT_REVIEW')::integer AS reviewing FROM orders`,
-    db()`SELECT count(*)::integer AS total FROM ticket_checkins`,
-    db()`SELECT b.id,b.created_at,count(t.id)::integer AS total,count(t.id) FILTER(WHERE t.status='NEEDS_REVIEW')::integer AS review FROM ticket_import_batches b LEFT JOIN ticket_inventory t ON t.batch_id=b.id GROUP BY b.id ORDER BY b.created_at DESC LIMIT 20`,
-    db()`SELECT id,name,email,role,created_at FROM users ORDER BY created_at DESC LIMIT 50`,
+    db()`SELECT count(*) FILTER (WHERE status='CONFIRMED')::integer AS confirmed,count(*) FILTER(WHERE status='PAYMENT_REVIEW')::integer AS reviewing FROM orders WHERE is_demo=${demo}`,
+    db()`SELECT count(*)::integer AS total FROM ticket_checkins c JOIN ticket_inventory t ON t.id=c.ticket_id WHERE t.is_demo=${demo}`,
+    db()`SELECT b.id,b.created_at,count(t.id)::integer AS total,count(t.id) FILTER(WHERE t.status='NEEDS_REVIEW')::integer AS review FROM ticket_import_batches b LEFT JOIN ticket_inventory t ON t.batch_id=b.id AND t.is_demo=${demo} GROUP BY b.id ORDER BY b.created_at DESC LIMIT 20`,
+    db()`SELECT id,name,email,role,created_at FROM users WHERE is_demo=${demo} ORDER BY created_at DESC LIMIT 50`,
   ]);
   const payment = settingValue<{
     bank: string;
@@ -471,8 +472,9 @@ export default async function AdminPage({
         <section id="stream" className="dashboard-section">
           <p className="eyebrow">06 / LIVESTREAM</p>
           <h2>{t.streamControls}</h2>
-          <p>{t.useTheOfficialYouTubeVideoID}</p>
-          <form className="panel admin-form" action={configureStream}>
+          <p>{demo ? (en ? "Choose the simulated broadcast state. The demo player uses CC0 sample content." : "Pilih status siaran simulasi. Player demo memakai konten sampel CC0.") : t.useTheOfficialYouTubeVideoID}</p>
+          <form className="panel admin-form" action={demo ? setDemoStreamState : configureStream}>
+            {!demo && (
             <label>
               {t.youTubeVideoID}
               <input
@@ -483,6 +485,7 @@ export default async function AdminPage({
                 required
               />
             </label>
+            )}
             <label>
               Status
               <select

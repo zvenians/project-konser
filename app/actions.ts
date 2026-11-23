@@ -409,6 +409,23 @@ export async function configureStream(form: FormData) {
   redirect("/admin");
 }
 
+export async function setDemoStreamState(form: FormData) {
+  requireDemoMode();
+  const admin = await requireAdmin();
+  const state = z.enum(["NOT_STARTED", "LIVE", "ENDED"]).parse(form.get("state"));
+  const value = JSON.stringify({
+    state,
+    demo: true,
+    sampleUrl: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+  });
+  await db().begin(async (tx) => {
+    await tx`INSERT INTO site_settings(key,value) VALUES ('stream',${value}::jsonb) ON CONFLICT(key) DO UPDATE SET value=excluded.value`;
+    await tx`UPDATE events SET streaming_ready=true`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${admin.id},'DEMO_STREAM_STATE','stream',${JSON.stringify({ state, simulated: true })}::jsonb)`;
+  });
+  redirect("/admin#stream");
+}
+
 export async function setTicketSale(form: FormData) {
   const admin = await requireAdmin();
   const id = z.uuid().parse(form.get("classId"));

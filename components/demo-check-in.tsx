@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, ScanLine } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 
@@ -16,7 +16,7 @@ export function DemoCheckIn({ locale }: { locale: Locale }) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
 
-  async function validate(value = barcode) {
+  const validate = useCallback(async (value = barcode) => {
     setMessage(en ? "Validating…" : "Memvalidasi…");
     const response = await fetch("/api/demo/check-in", {
       method: "POST",
@@ -25,7 +25,7 @@ export function DemoCheckIn({ locale }: { locale: Locale }) {
     });
     const result = await response.json();
     setMessage(result.message);
-  }
+  }, [barcode, en]);
 
   async function startCamera() {
     if (!("BarcodeDetector" in window) || !navigator.mediaDevices?.getUserMedia) {
@@ -53,7 +53,7 @@ export function DemoCheckIn({ locale }: { locale: Locale }) {
       }
     }, 600);
     return () => window.clearInterval(timer);
-  }, [camera]);
+  }, [camera, validate]);
 
   useEffect(() => () => stream.current?.getTracks().forEach((track) => track.stop()), []);
 

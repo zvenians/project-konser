@@ -1,6 +1,6 @@
 import { hash } from "bcryptjs";
-import { db } from "./db.ts";
-import { requireDemoMode } from "./demo-config.ts";
+import { db } from "./db";
+import { requireDemoMode } from "./demo-config";
 
 export const DEMO_ACCOUNTS = {
   customer: "customer@demo.symphonyoffaith.local",
@@ -60,17 +60,19 @@ export async function ensureDemoData() {
     }
 
     const [customer] = await tx`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS.customer}`;
+    const [finance] = await tx`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS.finance}`;
     const [event] = await tx`SELECT id FROM events ORDER BY starts_at LIMIT 1`;
     const [liveClass] = await tx`SELECT id,price FROM ticket_classes WHERE mode='LIVESTREAM' AND name='Gold' LIMIT 1`;
     const historicalKey = "00000000-0000-4000-8000-000000000027";
     const [historical] = await tx`INSERT INTO orders(user_id,idempotency_key,status,total,expires_at,is_demo,demo_historical)
-      VALUES (${customer.id},${historicalKey},'CONFIRMED',${liveClass.price},now()+interval '365 days',true,true)
-      ON CONFLICT(idempotency_key) DO UPDATE SET status='CONFIRMED' RETURNING id`;
+      VALUES (${finance.id},${historicalKey},'CONFIRMED',${liveClass.price},now()+interval '365 days',true,true)
+      ON CONFLICT(idempotency_key) DO UPDATE SET status='CONFIRMED',user_id=excluded.user_id RETURNING id`;
     await tx`INSERT INTO order_items(order_id,class_id,quantity,unit_price) VALUES (${historical.id},${liveClass.id},1,${liveClass.price}) ON CONFLICT(order_id,class_id) DO NOTHING`;
-    await tx`INSERT INTO stream_entitlements(user_id,event_id,order_id,active) VALUES (${customer.id},${event.id},${historical.id},true) ON CONFLICT(user_id,event_id,order_id) DO UPDATE SET active=true`;
+    await tx`DELETE FROM stream_entitlements WHERE order_id=${historical.id}`;
+    await tx`INSERT INTO stream_entitlements(user_id,event_id,order_id,active) VALUES (${finance.id},${event.id},${historical.id},true) ON CONFLICT(user_id,event_id,order_id) DO UPDATE SET active=true`;
     await tx`INSERT INTO demo_payments(order_id,outcome) VALUES (${historical.id},'SUCCESS') ON CONFLICT(order_id) DO NOTHING`;
     await tx`INSERT INTO notification_outbox(order_id,kind,status,user_id,recipient,demo_message)
-      VALUES (${historical.id},'PAYMENT_CONFIRMED','SIMULATED_DELIVERED',${customer.id},'DEMO ONLY',${JSON.stringify({ title: "Pembayaran demo berhasil", body: "Pesanan livestream demo telah dikonfirmasi.", simulated: true })}::jsonb)
+      VALUES (${historical.id},'PAYMENT_CONFIRMED','SIMULATED_DELIVERED',${finance.id},'DEMO ONLY',${JSON.stringify({ title: "Pembayaran demo berhasil", body: "Pesanan livestream demo telah dikonfirmasi.", simulated: true })}::jsonb)
       ON CONFLICT(order_id,kind) DO NOTHING`;
 
     const [campaign] = await tx`SELECT id FROM donation_campaigns ORDER BY id LIMIT 1`;

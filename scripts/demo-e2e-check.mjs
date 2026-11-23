@@ -61,7 +61,24 @@ try {
   await checkin.getByText(/Check-in berhasil/i).waitFor();
   await checkin.getByRole("button", { name: /Validasi check-in/i }).click();
   await checkin.getByText(/sudah digunakan/i).waitFor();
-  console.log(JSON.stringify({ result: "venue-purchase-and-checkin-passed", before, after }));
+
+  await page.goto(`${base}/account`);
+  await page.goto(`${base}/login`);
+  await page.getByRole("button", { name: /Masuk sebagai Demo Customer/i }).click();
+  await page.waitForURL("**/account");
+  await page.goto(`${base}/#tickets`);
+  await page.getByRole("tab", { name: "Livestream" }).click();
+  const liveGold = page.locator(".picker-row").filter({ hasText: "Gold" }).first();
+  await liveGold.getByRole("button", { name: "+ Gold" }).click();
+  await page.getByRole("link", { name: /Lanjut ke checkout/i }).click();
+  await page.getByRole("button", { name: /Buat reservasi/i }).click();
+  await page.waitForURL("**/account?reserved=1");
+  await page.getByRole("button", { name: /Bayar berhasil/i }).first().click();
+  await page.waitForURL("**/account?demoPayment=success");
+  await page.goto(`${base}/livestream`);
+  await page.locator("video[data-demo-stream]").waitFor();
+  assert.equal(await page.locator("[data-stream-state]").innerText(), "LIVE");
+  console.log(JSON.stringify({ result: "venue-checkin-and-livestream-passed", before, after }));
 } finally {
   await browser.close();
 }

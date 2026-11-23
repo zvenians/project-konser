@@ -58,7 +58,12 @@ export async function GET(
       );
     if (ticket.is_demo) {
       if (!demoModeEnabled()) return NextResponse.json({ error: "Demo tidak aktif." }, { status: 404 });
-      const bytes = await createDemoTicket(ticket);
+      const bytes = await createDemoTicket({
+        id: String(ticket.id),
+        name: String(ticket.name),
+        barcode: String(ticket.barcode),
+        order_id: String(ticket.order_id),
+      });
       return new Response(Buffer.from(bytes), {
         headers: {
           "Content-Type": "application/pdf",

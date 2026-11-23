@@ -8,7 +8,7 @@
     "format": "prettier --write app components/cart-clearer.tsx components/checkout-cart.tsx components/event-motion.tsx components/public-navigation.tsx components/share-button.tsx components/ticket-picker.tsx lib scripts tests",
     "start": "next start",
     "db:migrate": "node scripts/migrate.mjs",
-    "demo:seed": "node --experimental-strip-types scripts/seed-demo.mjs",
+    "demo:seed": "tsx scripts/seed-demo.mjs",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "admin:create": "node scripts/create-admin.mjs"
   },
@@ -52,6 +52,7 @@
     "eslint-config-next": "^16.4.6",
     "playwright": "^1.65.1",
     "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3"
   }
 }
