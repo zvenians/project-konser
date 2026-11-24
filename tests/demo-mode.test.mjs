@@ -16,13 +16,19 @@ test("demo mode is available in preview when explicitly enabled", () => {
   }), true);
 });
 
-test("demo mode can never activate in Vercel production", () => {
+test("Vercel production requires a dedicated production opt-in", () => {
   assert.equal(demoModeEnabled({
     DEMO_MODE: "true",
-    DEMO_LOCAL: "true",
     NODE_ENV: "production",
     VERCEL_ENV: "production",
   }), false);
+
+  assert.equal(demoModeEnabled({
+    DEMO_MODE: "true",
+    DEMO_PRODUCTION: "true",
+    NODE_ENV: "production",
+    VERCEL_ENV: "production",
+  }), true);
 });
 
 test("local production builds require a second explicit opt-in", () => {
