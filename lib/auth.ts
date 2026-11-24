@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { demoModeEnabled } from "@/lib/demo-config";
+import { hasCapability } from "@/lib/permissions";
 
 const digest = (token: string) =>
   createHash("sha256").update(token).digest("hex");
@@ -24,27 +25,27 @@ export async function requireUser() {
 
 export async function requireAdmin() {
   const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Akses ditolak.");
+  if (!hasCapability(user.role, "settings")) throw new Error("Akses ditolak.");
   return user;
 }
 
 export async function requireFinance() {
   const user = await requireUser();
-  if (user.role !== "ADMIN" && user.role !== "FINANCE")
+  if (!hasCapability(user.role, "finance"))
     throw new Error("Akses ditolak.");
   return user;
 }
 
 export async function requireCheckIn() {
   const user = await requireUser();
-  if (user.role !== "ADMIN" && user.role !== "CHECK_IN")
+  if (!hasCapability(user.role, "checkin"))
     throw new Error("Akses ditolak.");
   return user;
 }
 
 export async function requireStreamOperator() {
   const user = await requireUser();
-  if (user.role !== "ADMIN" && user.role !== "STREAM_OPERATOR")
+  if (!hasCapability(user.role, "stream"))
     throw new Error("Akses ditolak.");
   return user;
 }

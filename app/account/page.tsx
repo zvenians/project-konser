@@ -8,7 +8,6 @@ import { getLocale } from "@/lib/i18n";
 import { secondaryMessages, secondaryStatus } from "@/lib/secondary-messages";
 import { CartClearer } from "@/components/cart-clearer";
 import { demoModeEnabled } from "@/lib/demo-config";
-import { ensureDemoData } from "@/lib/demo-data";
 
 export default async function AccountPage({
   searchParams,
@@ -18,7 +17,6 @@ export default async function AccountPage({
   const params = await searchParams;
   const reserved = params.reserved === "1";
   const demo = demoModeEnabled();
-  if (demo) await ensureDemoData();
   const locale = await getLocale();
   const en = locale === "en";
   const t = secondaryMessages(locale).account;

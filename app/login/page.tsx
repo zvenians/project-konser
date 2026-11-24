@@ -2,7 +2,6 @@ import { demoLogin, login, register } from "@/app/actions";
 import Link from "next/link";
 import { getLocale } from "@/lib/i18n";
 import { demoModeEnabled } from "@/lib/demo-config";
-import { ensureDemoData } from "@/lib/demo-data";
 
 export default async function LoginPage({
   searchParams,
@@ -11,7 +10,6 @@ export default async function LoginPage({
 }) {
   const locale = await getLocale();
   const demo = demoModeEnabled();
-  if (demo) await ensureDemoData();
   const next =
     (await searchParams).next === "checkout" ? "/checkout" : "/account";
   const en = locale === "en";
