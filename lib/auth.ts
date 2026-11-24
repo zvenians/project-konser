@@ -52,7 +52,13 @@ export async function requireStreamOperator() {
 
 export async function createSession(userId: string) {
   const token = randomBytes(32).toString("base64url");
-  await db()`INSERT INTO sessions(token_hash,user_id,expires_at) VALUES (${digest(token)},${userId},now()+interval '7 days')`;
+  await db().begin(async (tx) => {
+    const [user] = await tx`SELECT is_demo,role FROM users WHERE id=${userId} FOR UPDATE`;
+    if (!user) throw new Error("Akun tidak ditemukan.");
+    if (user.is_demo && user.role === "CUSTOMER")
+      await tx`DELETE FROM sessions WHERE user_id=${userId}`;
+    await tx`INSERT INTO sessions(token_hash,user_id,expires_at) VALUES (${digest(token)},${userId},now()+interval '7 days')`;
+  });
   (await cookies()).set("sof_session", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

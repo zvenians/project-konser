@@ -72,22 +72,24 @@ async function reconcileDemoInventory(
 
 async function ensureAccounts() {
   const sql = db();
-  const existing =
-    await sql`SELECT email FROM users WHERE email = ANY(${Object.values(DEMO_ACCOUNTS)})`;
-  if (existing.length === 3) return;
   for (const account of [
     [DEMO_ACCOUNTS.customer, "Demo Customer", "CUSTOMER"],
     [DEMO_ACCOUNTS.admin, "Demo Administrator", "ADMIN"],
     [DEMO_ACCOUNTS.finance, "Demo Finance", "FINANCE"],
   ] as const) {
     const passwordHash = await hash(randomBytes(48).toString("base64url"), 12);
-    await sql`INSERT INTO users(email,name,password_hash,role,is_demo) VALUES (${account[0]},${account[1]},${passwordHash},${account[2]},true) ON CONFLICT(email) DO UPDATE SET name=excluded.name,role=excluded.role,is_demo=true`;
+    await sql.begin(async (tx) => {
+      const [user] = await tx`INSERT INTO users(email,name,password_hash,role,is_demo) VALUES (${account[0]},${account[1]},${passwordHash},${account[2]},true) ON CONFLICT(email) DO UPDATE SET name=excluded.name,password_hash=excluded.password_hash,role=excluded.role,is_demo=true RETURNING id`;
+      await tx`DELETE FROM sessions WHERE user_id=${user.id}`;
+    });
   }
 }
 
 export async function ensureDemoData() {
   requireDemoMode();
   const sql = db();
+  // Controlled seeding also rotates all legacy demo credentials and sessions.
+  await ensureAccounts();
   const [ready] = await sql`SELECT
     NOT EXISTS (
       SELECT 1 FROM (VALUES
@@ -104,7 +106,6 @@ export async function ensureDemoData() {
     EXISTS(SELECT 1 FROM orders WHERE idempotency_key='00000000-0000-4000-8000-000000000027') AS history_ready`;
   if (ready.inventory_ready && ready.accounts_ready && ready.history_ready)
     return;
-  await ensureAccounts();
   await sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(762027)`;
     await tx`UPDATE ticket_classes SET sale_enabled=true`;
