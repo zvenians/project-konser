@@ -18,7 +18,7 @@ export function DemoCheckIn({ locale }: { locale: Locale }) {
 
   const validate = useCallback(async (value = barcode) => {
     setMessage(en ? "Validating…" : "Memvalidasi…");
-    const response = await fetch("/api/demo/check-in", {
+    const response = await fetch("/api/admin/check-in", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ barcode: value }),

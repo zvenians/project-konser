@@ -1,7 +1,10 @@
 import postgres from "postgres";
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL diperlukan");
+const target = process.env.DB_TARGET ?? "production";
+const url = target === "demo" ? process.env.DEMO_DATABASE_URL : process.env.DATABASE_URL;
+if (!url) throw new Error(target === "demo" ? "DEMO_DATABASE_URL diperlukan" : "DATABASE_URL diperlukan");
+if (process.env.DATABASE_URL && process.env.DEMO_DATABASE_URL && process.env.DATABASE_URL === process.env.DEMO_DATABASE_URL)
+  throw new Error("Database demo dan produksi tidak boleh sama");
 const sql = postgres(url, { max: 1, prepare: false });
 
 const expectedVenue = new Map([
@@ -30,7 +33,7 @@ try {
     if (!row || Number(row.price) !== price || Number(row.purchase_limit ?? row.capacity) <= 0)
       throw new Error(`Katalog livestream ${name} tidak sesuai`);
   }
-  console.log(JSON.stringify({ status: "ok", migrations: migrations.map((row) => row.name), venueCapacity: 1685, livestreamPackages: 7 }));
+  console.log(JSON.stringify({ status: "ok", target, migrations: migrations.map((row) => row.name), venueCapacity: 1685, livestreamPackages: 7 }));
 } finally {
   await sql.end();
 }

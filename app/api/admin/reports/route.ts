@@ -28,7 +28,23 @@ export async function GET(request: Request) {
       ];
       rows =
         await db()`SELECT o.id,o.created_at,u.name AS buyer,u.email,o.status,o.total,p.transfer_reference AS payment_reference,p.bank_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} ORDER BY o.created_at DESC`;
-    } else if (kind === "donations") {
+    } else if (kind === "venue" || kind === "livestream") {
+      headers = [
+        "order_id",
+        "created_at",
+        "buyer",
+        "email",
+        "category",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "status",
+      ];
+      const mode = kind === "venue" ? "VENUE" : "LIVESTREAM";
+      rows = await db()`SELECT o.id AS order_id,o.created_at,u.name AS buyer,u.email,c.name AS category,i.quantity,i.unit_price,(i.quantity*i.unit_price) AS line_total,o.status
+        FROM order_items i JOIN orders o ON o.id=i.order_id JOIN users u ON u.id=o.user_id JOIN ticket_classes c ON c.id=i.class_id
+        WHERE o.is_demo=${demo} AND c.mode=${mode} ORDER BY o.created_at DESC`;
+    } else if (kind === "donations" || kind === "contributions") {
       headers = [
         "id",
         "created_at",

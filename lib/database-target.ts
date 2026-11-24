@@ -8,11 +8,12 @@ function demoDatabaseEnabled(env: NodeJS.ProcessEnv) {
 
 export function resolveDatabaseUrl(env: NodeJS.ProcessEnv) {
   if (demoDatabaseEnabled(env)) {
-    if (!env.DEMO_DATABASE_URL)
+    const demoUrl = env.DEMO_DATABASE_URL || env.DEMO_DATABASE_DATABASE_URL;
+    if (!demoUrl)
       throw new Error("DEMO_DATABASE_URL belum dikonfigurasi untuk lingkungan demo");
-    if (env.DEMO_DATABASE_URL === env.DATABASE_URL)
+    if (demoUrl === env.DATABASE_URL)
       throw new Error("Database demo dan produksi harus berbeda");
-    return env.DEMO_DATABASE_URL;
+    return demoUrl;
   }
   if (!env.DATABASE_URL) throw new Error("DATABASE_URL belum dikonfigurasi");
   return env.DATABASE_URL;

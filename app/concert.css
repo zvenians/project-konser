@@ -1081,3 +1081,8 @@
     padding-block: 24px 60px;
   }
 }
+.reservation-countdown {
+  color: var(--accent, #9f6b22);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}

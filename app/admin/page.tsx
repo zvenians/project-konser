@@ -3,7 +3,6 @@ import {
   configurePayment,
   configureStream,
   confirmOrder,
-  checkInTicket,
   releaseExpired,
   setTicketSale,
   setUserRole,
@@ -31,7 +30,7 @@ const messagePreview = (value: unknown) => {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string; demoReset?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; from?: string; to?: string; demoReset?: string }>;
 }) {
   const locale = await getLocale();
   const demo = demoModeEnabled();
@@ -45,6 +44,8 @@ export default async function AdminPage({
   const canOperateStream = hasCapability(user.role, "stream");
   const params = await searchParams;
   const q = (params.q ?? "").trim().slice(0, 100);
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(params.from ?? "") ? params.from! : "";
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(params.to ?? "") ? params.to! : "";
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const offset = (page - 1) * 25;
   const status = [
@@ -67,19 +68,20 @@ export default async function AdminPage({
     notifications,
     streamSettings,
     summary,
+    revenue,
     checkins,
     batches,
     users,
     donationHistory,
   ] = await Promise.all([
-    canOperateInventory ? db()`SELECT c.id,c.name,c.mode,c.capacity,c.sale_enabled,
+    canOperateInventory ? db()`SELECT c.id,c.name,c.mode,c.capacity,c.sales_target,c.purchase_limit,c.sale_enabled,
       count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo}) AS available,
       count(t.id) FILTER(WHERE t.status='RESERVED' AND t.is_demo=${demo}) AS reserved,
       count(t.id) FILTER(WHERE t.status='SOLD' AND t.is_demo=${demo}) AS sold,
       coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW')),0) AS stream_reserved,
       coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status='CONFIRMED'),0) AS stream_sold
       FROM ticket_classes c LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id ORDER BY c.mode,c.price DESC` : Promise.resolve([]),
-    canViewFinance ? db()`SELECT o.id,o.status,o.total,o.expires_at,u.name,u.email,p.transfer_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} AND (${q}='' OR u.name ILIKE ${`%${q}%`} OR u.email ILIKE ${`%${q}%`} OR o.id::text ILIKE ${`%${q}%`}) AND (${status}='ALL' OR o.status=${status}) ORDER BY o.created_at DESC LIMIT 25 OFFSET ${offset}` : Promise.resolve([]),
+    canViewFinance ? db()`SELECT o.id,o.status,o.total,o.expires_at,u.name,u.email,p.transfer_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} AND (${q}='' OR u.name ILIKE ${`%${q}%`} OR u.email ILIKE ${`%${q}%`} OR o.id::text ILIKE ${`%${q}%`}) AND (${status}='ALL' OR o.status=${status}) AND (NULLIF(${from},'')::date IS NULL OR o.created_at>=NULLIF(${from},'')::date) AND (NULLIF(${to},'')::date IS NULL OR o.created_at<(NULLIF(${to},'')::date+1)) ORDER BY o.created_at DESC LIMIT 25 OFFSET ${offset}` : Promise.resolve([]),
     canViewFinance ? db()`SELECT status,count(*) AS count,coalesce(sum(amount),0) AS total FROM donations WHERE is_demo=${demo} GROUP BY status` : Promise.resolve([]),
     canOperateInventory ? db()`SELECT t.id,c.name,t.barcode,t.original_name FROM ticket_inventory t JOIN ticket_classes c ON c.id=t.class_id WHERE t.status='NEEDS_REVIEW' AND t.is_demo=${demo} ORDER BY t.id LIMIT 50` : Promise.resolve([]),
     canViewFinance ? db()`SELECT id,donor_name,amount,payment_reference FROM donations WHERE status='PENDING' AND expires_at>now() AND is_demo=${demo} ORDER BY created_at LIMIT 50` : Promise.resolve([]),
@@ -87,6 +89,7 @@ export default async function AdminPage({
     canViewFinance ? db()`SELECT n.id,n.kind,n.status,n.demo_message,n.created_at,u.name FROM notification_outbox n JOIN orders o ON o.id=n.order_id JOIN users u ON u.id=n.user_id WHERE o.is_demo=${demo} ORDER BY n.created_at DESC LIMIT 50` : Promise.resolve([]),
     canOperateStream ? db()`SELECT value FROM site_settings WHERE key='stream'` : Promise.resolve([]),
     canViewFinance ? db()`SELECT count(*) FILTER (WHERE status='CONFIRMED')::integer AS confirmed,count(*) FILTER(WHERE status='PAYMENT_REVIEW')::integer AS reviewing FROM orders WHERE is_demo=${demo}` : Promise.resolve([]),
+    canViewFinance ? db()`SELECT c.mode,count(DISTINCT o.id)::integer AS orders,coalesce(sum(i.quantity),0)::integer AS quantity,coalesce(sum(i.quantity*i.unit_price),0) AS revenue FROM order_items i JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE o.is_demo=${demo} AND o.status='CONFIRMED' GROUP BY c.mode` : Promise.resolve([]),
     canCheckIn ? db()`SELECT count(*)::integer AS total FROM ticket_checkins c JOIN ticket_inventory t ON t.id=c.ticket_id WHERE t.is_demo=${demo}` : Promise.resolve([]),
     canOperateInventory ? db()`SELECT b.id,b.created_at,count(t.id)::integer AS total,count(t.id) FILTER(WHERE t.status='NEEDS_REVIEW')::integer AS review FROM ticket_import_batches b LEFT JOIN ticket_inventory t ON t.batch_id=b.id AND t.is_demo=${demo} GROUP BY b.id ORDER BY b.created_at DESC LIMIT 20` : Promise.resolve([]),
     user.role === "ADMIN" ? db()`SELECT id,name,email,role,created_at FROM users WHERE is_demo=${demo} ORDER BY created_at DESC LIMIT 50` : Promise.resolve([]),
@@ -142,10 +145,20 @@ export default async function AdminPage({
               )}
             </strong>
           </div>
+          <div>
+            <span>{en ? "Venue revenue" : "Pendapatan venue"}</span>
+            <strong>{money(revenue.find((row) => row.mode === "VENUE")?.revenue ?? 0)}</strong>
+          </div>
+          <div>
+            <span>{en ? "Livestream revenue" : "Pendapatan livestream"}</span>
+            <strong>{money(revenue.find((row) => row.mode === "LIVESTREAM")?.revenue ?? 0)}</strong>
+          </div>
         </div>
         <p className="hint">{t.ordersShowTheLatest100Transactions}</p>
         <div className="report-links">
           <a href="/api/admin/reports?kind=orders">{t.exportOrdersCSV} ↗</a>
+          <a href="/api/admin/reports?kind=venue">Venue CSV ↗</a>
+          <a href="/api/admin/reports?kind=livestream">Livestream CSV ↗</a>
           <a href="/api/admin/reports?kind=donations">
             {t.exportDonationsCSV} ↗
           </a>
@@ -160,6 +173,8 @@ export default async function AdminPage({
               <tr>
                 <th>{t.class}</th>
                 <th>{t.capacity}</th>
+                <th>{en ? "Sales target" : "Target penjualan"}</th>
+                <th>{en ? "Purchase limit" : "Batas pembelian"}</th>
                 <th>{t.available}</th>
                 <th>{t.reserved}</th>
                 <th>{t.sold}</th>
@@ -173,6 +188,8 @@ export default async function AdminPage({
                     {row.mode} · {row.name}
                   </th>
                   <td>{row.capacity ?? "—"}</td>
+                  <td>{row.sales_target ?? "—"}</td>
+                  <td>{row.purchase_limit ?? "—"}</td>
                   <td>{row.mode === "VENUE" ? row.available : Math.max(0, Number(row.capacity) - Number(row.stream_reserved) - Number(row.stream_sold))}</td>
                   <td>{row.mode === "VENUE" ? row.reserved : row.stream_reserved}</td>
                   <td>{row.mode === "VENUE" ? row.sold : row.stream_sold}</td>
@@ -313,17 +330,7 @@ export default async function AdminPage({
           <p>
             {checkins[0]?.total ?? 0} {t.ticketsCheckedIn}
           </p>
-          {demo ? (
-            <DemoCheckIn locale={locale} />
-          ) : (
-            <form className="panel admin-form" action={checkInTicket}>
-              <label>
-                {t.barcodeQRFromOriginalPDF}
-                <input name="barcode" required minLength={3} />
-              </label>
-              <button type="submit">{t.validateCheckIn}</button>
-            </form>
-          )}
+          <DemoCheckIn locale={locale} />
         </section>
       )}
       {canViewFinance && <section id="payments" className="dashboard-section">
@@ -351,6 +358,14 @@ export default async function AdminPage({
                 </option>
               ))}
             </select>
+          </label>
+          <label>
+            {en ? "From" : "Dari tanggal"}
+            <input type="date" name="from" defaultValue={from} />
+          </label>
+          <label>
+            {en ? "To" : "Sampai tanggal"}
+            <input type="date" name="to" defaultValue={to} />
           </label>
           <button type="submit">{t.applyFilters}</button>
         </form>
@@ -419,9 +434,9 @@ export default async function AdminPage({
           </div>
         )}
         <div className="pagination" aria-label={en ? "Order pages" : "Halaman pesanan"}>
-          {page > 1 && <a href={`/admin?q=${encodeURIComponent(q)}&status=${status}&page=${page - 1}#payments`}>{en ? "Previous" : "Sebelumnya"}</a>}
+          {page > 1 && <a href={`/admin?q=${encodeURIComponent(q)}&status=${status}&from=${from}&to=${to}&page=${page - 1}#payments`}>{en ? "Previous" : "Sebelumnya"}</a>}
           <span>{en ? "Page" : "Halaman"} {page}</span>
-          {orders.length === 25 && <a href={`/admin?q=${encodeURIComponent(q)}&status=${status}&page=${page + 1}#payments`}>{en ? "Next" : "Berikutnya"}</a>}
+          {orders.length === 25 && <a href={`/admin?q=${encodeURIComponent(q)}&status=${status}&from=${from}&to=${to}&page=${page + 1}#payments`}>{en ? "Next" : "Berikutnya"}</a>}
         </div>
       </section>}
       {canViewFinance && <section id="donations" className="dashboard-section">

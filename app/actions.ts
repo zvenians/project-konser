@@ -1,7 +1,7 @@
 "use server";
 
 import { compare, hash } from "bcryptjs";
-import { timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -21,6 +21,7 @@ import { demoModeEnabled, requireDemoMode } from "@/lib/demo-config";
 import { DEMO_ACCOUNTS, resetDemoData } from "@/lib/demo-data";
 import { contributionTiers, livestreamPackages, venueClasses } from "@/lib/event";
 import { cartTotal, reservationIsActive } from "@/lib/transactions";
+import { demoCustomerEmail } from "@/lib/demo-identity";
 
 const credentials = z.object({
   email: z.email().max(254),
@@ -66,7 +67,7 @@ export async function login(form: FormData) {
   )
     throw new Error("Terlalu banyak percobaan. Coba lagi dalam 15 menit.");
   const [user] =
-    await db()`SELECT id,password_hash FROM users WHERE email=${email} AND is_demo=${demo}`;
+    await db()`SELECT id,password_hash FROM users WHERE email=${email} AND is_demo=${demo} AND (${demo}=false OR role='CUSTOMER')`;
   if (!user || !(await compare(values.password, user.password_hash))) {
     await db()`INSERT INTO login_attempts(email,attempts,window_started_at) VALUES (${email},1,now()) ON CONFLICT(email) DO UPDATE SET attempts=CASE WHEN login_attempts.window_started_at<now()-interval '15 minutes' THEN 1 ELSE login_attempts.attempts+1 END,window_started_at=CASE WHEN login_attempts.window_started_at<now()-interval '15 minutes' THEN now() ELSE login_attempts.window_started_at END,locked_until=CASE WHEN login_attempts.attempts>=9 AND login_attempts.window_started_at>=now()-interval '15 minutes' THEN now()+interval '15 minutes' ELSE NULL END`;
     throw new Error("Email atau kata sandi salah.");
@@ -85,7 +86,11 @@ export async function demoLogin(form: FormData) {
     const valid = expected.length > 0 && supplied.length === expected.length && timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
     if (!valid) throw new Error("Kode akses demo tidak valid.");
   }
-  const [user] = await db()`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS[role]} AND is_demo=true`;
+  const [user] = role === "customer"
+    ? await db()`INSERT INTO users(email,name,password_hash,role,is_demo)
+        VALUES (${demoCustomerEmail()},'Demo Customer',${await hash(randomBytes(48).toString("base64url"), 12)},'CUSTOMER',true)
+        RETURNING id`
+    : await db()`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS[role]} AND is_demo=true`;
   if (!user) throw new Error("Akun demo tidak tersedia.");
   await createSession(user.id);
   const next = form.get("next");
@@ -162,7 +167,7 @@ export async function reserve(form: FormData) {
       if (ticketClass.mode === "LIVESTREAM" && !ticketClass.streaming_ready)
         throw new Error("Akses livestream belum tersedia.");
       if (ticketClass.mode === "LIVESTREAM") {
-        const purchaseLimit = Number(ticketClass.capacity);
+        const purchaseLimit = Number(ticketClass.purchase_limit ?? ticketClass.capacity);
         const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
         if (item.quantity + Number(usage.total) > purchaseLimit)
           throw new Error("Batas paket livestream sudah tercapai.");
@@ -209,13 +214,13 @@ export async function simulateDemoPayment(form: FormData) {
   if (!user.is_demo) throw new Error("Akun ini bukan akun demo.");
   const orderId = z.uuid().parse(form.get("orderId"));
   const outcome = z.enum(["SUCCESS", "FAILED", "CANCELLED"]).parse(form.get("outcome"));
-  await db().begin(async (tx) => {
+  const result = await db().begin(async (tx) => {
     const [order] = await tx`SELECT id,user_id,status,total,expires_at FROM orders WHERE id=${orderId} AND user_id=${user.id} AND is_demo=true FOR UPDATE`;
     if (!order) throw new Error("Pesanan demo tidak ditemukan.");
     const [existing] = await tx`SELECT outcome FROM demo_payments WHERE order_id=${orderId}`;
     if (existing) {
       if (existing.outcome !== outcome) throw new Error("Hasil pembayaran demo sudah ditetapkan.");
-      return;
+      return { expired: false };
     }
     if (order.status !== "PENDING") throw new Error("Pesanan demo sudah diproses.");
     if (!reservationIsActive(order.status, order.expires_at)) {
@@ -224,7 +229,7 @@ export async function simulateDemoPayment(form: FormData) {
       await tx`DELETE FROM ticket_allocations WHERE item_id IN (SELECT id FROM order_items WHERE order_id=${orderId})`;
       await tx`UPDATE stream_entitlements SET active=false WHERE order_id=${orderId}`;
       await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING','EXPIRED')`;
-      throw new Error("Reservasi demo sudah kedaluwarsa.");
+      return { expired: true };
     }
     await tx`INSERT INTO demo_payments(order_id,outcome,receipt_label) VALUES (${orderId},${outcome},'SIMULATED')`;
     if (outcome === "SUCCESS") {
@@ -252,7 +257,9 @@ export async function simulateDemoPayment(form: FormData) {
       await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING',${status})`;
     }
     await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${user.id},'DEMO_PAYMENT',${orderId},${JSON.stringify({ outcome, simulated: true })}::jsonb)`;
+    return { expired: false };
   });
+  if (result.expired) throw new Error("Reservasi demo sudah kedaluwarsa. Stok telah dipulihkan.");
   redirect(`/account?demoPayment=${outcome.toLowerCase()}`);
 }
 

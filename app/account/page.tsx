@@ -8,6 +8,7 @@ import { getLocale } from "@/lib/i18n";
 import { secondaryMessages, secondaryStatus } from "@/lib/secondary-messages";
 import { CartClearer } from "@/components/cart-clearer";
 import { demoModeEnabled } from "@/lib/demo-config";
+import { ReservationCountdown } from "@/components/reservation-countdown";
 
 export default async function AccountPage({
   searchParams,
@@ -124,12 +125,18 @@ export default async function AccountPage({
                     WIB
                   </small>
                   {order.status === "PENDING" && (
-                    <form action={cancelOrder}>
-                      <input type="hidden" name="orderId" value={order.id} />
-                      <button className="secondary-button" type="submit">
-                        {t.cancelBooking}
-                      </button>
-                    </form>
+                    <>
+                      <ReservationCountdown
+                        expiresAt={new Date(order.expires_at).toISOString()}
+                        locale={locale}
+                      />
+                      <form action={cancelOrder}>
+                        <input type="hidden" name="orderId" value={order.id} />
+                        <button className="secondary-button" type="submit">
+                          {t.cancelBooking}
+                        </button>
+                      </form>
+                    </>
                   )}
                 </div>
                 {order.status === "PENDING" && demo && (

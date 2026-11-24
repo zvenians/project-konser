@@ -90,7 +90,7 @@ export default async function EventPage() {
   const locale = await getLocale();
   const t = translate(locale, messages);
   const [classes, settings] = await Promise.all([
-    db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.sale_enabled,e.streaming_ready,
+    db()`SELECT c.id,c.name,c.mode,c.price,coalesce(c.purchase_limit,c.capacity) AS capacity,c.sale_enabled,e.streaming_ready,
       count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS venue_available,
       coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')),0) AS stream_reserved
       FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready ORDER BY c.price DESC`,
@@ -209,7 +209,7 @@ export default async function EventPage() {
               <h2>{t.venueTickets}</h2>
               <p>{t.venueTicketsText}</p>
             </div>
-            <TicketPicker options={venueOptions} locale={locale} />
+            <TicketPicker options={venueOptions} cartOptions={[...venueOptions, ...streamOptions]} locale={locale} />
           </section>
           <section id="livestream" className="event-tickets product-section">
             <div className="product-section-intro">
@@ -217,7 +217,7 @@ export default async function EventPage() {
               <h2>{t.livestreamPackages}</h2>
               <p>{t.livestreamPackagesText}</p>
             </div>
-            <TicketPicker options={streamOptions} locale={locale} />
+            <TicketPicker options={streamOptions} cartOptions={[...venueOptions, ...streamOptions]} showCart={false} locale={locale} />
           </section>
           <section id="contributions" className="contribution-section">
             <div className="product-section-intro">
