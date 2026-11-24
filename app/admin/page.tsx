@@ -72,7 +72,7 @@ export default async function AdminPage({
     users,
     donationHistory,
   ] = await Promise.all([
-    canOperateInventory ? db()`SELECT c.id,c.name,c.mode,coalesce(c.purchase_limit,c.capacity) AS capacity,c.sale_enabled,
+    canOperateInventory ? db()`SELECT c.id,c.name,c.mode,c.capacity,c.sale_enabled,
       count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo}) AS available,
       count(t.id) FILTER(WHERE t.status='RESERVED' AND t.is_demo=${demo}) AS reserved,
       count(t.id) FILTER(WHERE t.status='SOLD' AND t.is_demo=${demo}) AS sold,

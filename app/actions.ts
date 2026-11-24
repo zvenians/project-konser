@@ -162,7 +162,7 @@ export async function reserve(form: FormData) {
       if (ticketClass.mode === "LIVESTREAM" && !ticketClass.streaming_ready)
         throw new Error("Akses livestream belum tersedia.");
       if (ticketClass.mode === "LIVESTREAM") {
-        const purchaseLimit = Number(ticketClass.purchase_limit ?? ticketClass.capacity);
+        const purchaseLimit = Number(ticketClass.capacity);
         const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
         if (item.quantity + Number(usage.total) > purchaseLimit)
           throw new Error("Batas paket livestream sudah tercapai.");
