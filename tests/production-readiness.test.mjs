@@ -29,6 +29,12 @@ test("mixed venue and livestream cart has one consistent total", () => {
   assert.equal(cartTotal([{ quantity: 2, price: 100000 }, { quantity: 1, price: 50000 }]), 250000);
 });
 
+test("homepage renders only one shared cart summary", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /cartOptions=\{\[\.\.\.venueOptions, \.\.\.streamOptions\]\}/);
+  assert.equal((source.match(/showCart=\{false\}/g) || []).length, 1);
+});
+
 test("expired reservations cannot be paid", () => {
   const now = Date.parse("2026-11-24T12:00:00Z");
   assert.equal(reservationIsActive("PENDING", "2026-11-24T12:01:00Z", now), true);

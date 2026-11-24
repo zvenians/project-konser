@@ -209,7 +209,7 @@ export default async function EventPage() {
               <h2>{t.venueTickets}</h2>
               <p>{t.venueTicketsText}</p>
             </div>
-            <TicketPicker options={venueOptions} locale={locale} />
+            <TicketPicker options={venueOptions} cartOptions={[...venueOptions, ...streamOptions]} locale={locale} />
           </section>
           <section id="livestream" className="event-tickets product-section">
             <div className="product-section-intro">
@@ -217,7 +217,7 @@ export default async function EventPage() {
               <h2>{t.livestreamPackages}</h2>
               <p>{t.livestreamPackagesText}</p>
             </div>
-            <TicketPicker options={streamOptions} locale={locale} />
+            <TicketPicker options={streamOptions} cartOptions={[...venueOptions, ...streamOptions]} showCart={false} locale={locale} />
           </section>
           <section id="contributions" className="contribution-section">
             <div className="product-section-intro">

@@ -20,9 +20,13 @@ export type TicketOption = {
 
 export function TicketPicker({
   options,
+  cartOptions = options,
+  showCart = true,
   locale,
 }: {
   options: TicketOption[];
+  cartOptions?: TicketOption[];
+  showCart?: boolean;
   locale: Locale;
 }) {
   const [mode, setMode] = useState<"VENUE" | "LIVESTREAM">(
@@ -82,7 +86,7 @@ export function TicketPicker({
           note: "Price and availability are confirmed when you reserve.",
         };
   const rows = options.filter((option) => option.mode === mode);
-  const selected = options.filter((option) => cart[option.id] > 0);
+  const selected = cartOptions.filter((option) => cart[option.id] > 0);
   const total = selected.reduce(
     (sum, option) => sum + option.price * cart[option.id],
     0,
@@ -199,7 +203,7 @@ export function TicketPicker({
         </div>
         <p className="picker-disclaimer">{t.note}</p>
       </div>
-      {count > 0 && (
+      {showCart && count > 0 && (
         <aside className="cart-panel" aria-live="polite">
           <h3>{t.summary}</h3>
           {selected.length ? (
@@ -236,7 +240,7 @@ export function TicketPicker({
         </aside>
       )}
       <AnimatePresence>
-        {count > 0 && (
+        {showCart && count > 0 && (
           <motion.div
             className="mobile-cart-bar"
             initial={{ y: 100 }}
