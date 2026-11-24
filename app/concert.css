@@ -192,6 +192,11 @@
   overflow: hidden;
   background: #0d1715;
 }
+.event-cover picture {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
 .event-cover::after {
   content: "";
   position: absolute;
