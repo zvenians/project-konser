@@ -6,12 +6,10 @@ import { db } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { settingValue } from "@/lib/settings";
 import { demoModeEnabled } from "@/lib/demo-config";
-import { ensureDemoData } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 export default async function CheckoutPage() {
   const demo = demoModeEnabled();
-  if (demo) await ensureDemoData();
   const locale = await getLocale();
   const [user, classes, settings] = await Promise.all([
     currentUser(),

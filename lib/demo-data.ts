@@ -1,4 +1,5 @@
 import { hash } from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import type { TransactionSql } from "postgres";
 import { db } from "./db";
 import { requireDemoMode } from "./demo-config";
@@ -9,8 +10,6 @@ export const DEMO_ACCOUNTS = {
   admin: "admin@demo.symphonyoffaith.local",
   finance: "finance@demo.symphonyoffaith.local",
 } as const;
-
-export const DEMO_PASSWORD = "DemoPreview2027!";
 
 const stockByClass = new Map(
   venueClasses.map((ticketClass) => [ticketClass.name, ticketClass.capacity]),
@@ -76,12 +75,12 @@ async function ensureAccounts() {
   const existing =
     await sql`SELECT email FROM users WHERE email = ANY(${Object.values(DEMO_ACCOUNTS)})`;
   if (existing.length === 3) return;
-  const passwordHash = await hash(DEMO_PASSWORD, 12);
   for (const account of [
     [DEMO_ACCOUNTS.customer, "Demo Customer", "CUSTOMER"],
     [DEMO_ACCOUNTS.admin, "Demo Administrator", "ADMIN"],
     [DEMO_ACCOUNTS.finance, "Demo Finance", "FINANCE"],
   ] as const) {
+    const passwordHash = await hash(randomBytes(48).toString("base64url"), 12);
     await sql`INSERT INTO users(email,name,password_hash,role,is_demo) VALUES (${account[0]},${account[1]},${passwordHash},${account[2]},true) ON CONFLICT(email) DO UPDATE SET name=excluded.name,role=excluded.role,is_demo=true`;
   }
 }
@@ -90,7 +89,17 @@ export async function ensureDemoData() {
   requireDemoMode();
   const sql = db();
   const [ready] = await sql`SELECT
-    (SELECT count(*) FROM ticket_inventory WHERE is_demo=true AND status<>'VOIDED')=1685 AS inventory_ready,
+    NOT EXISTS (
+      SELECT 1 FROM (VALUES
+        ('VVIP',77),('VIP',77),('GOLD',177),('SILVER',577),('REGULER',777)
+      ) AS expected(name,capacity)
+      LEFT JOIN ticket_classes c ON c.name=expected.name AND c.mode='VENUE'
+      LEFT JOIN LATERAL (
+        SELECT count(*)::integer AS total FROM ticket_inventory t
+        WHERE t.class_id=c.id AND t.is_demo=true AND t.status<>'VOIDED'
+      ) actual ON true
+      WHERE c.id IS NULL OR coalesce(actual.total,0)<>expected.capacity
+    ) AS inventory_ready,
     (SELECT count(*) FROM users WHERE email = ANY(${Object.values(DEMO_ACCOUNTS)}) AND is_demo=true)=3 AS accounts_ready,
     EXISTS(SELECT 1 FROM orders WHERE idempotency_key='00000000-0000-4000-8000-000000000027') AS history_ready`;
   if (ready.inventory_ready && ready.accounts_ready && ready.history_ready)

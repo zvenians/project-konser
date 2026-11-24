@@ -6,13 +6,11 @@ import { settingValue } from "@/lib/settings";
 import { getLocale } from "@/lib/i18n";
 import { secondaryMessages } from "@/lib/secondary-messages";
 import { demoModeEnabled } from "@/lib/demo-config";
-import { ensureDemoData } from "@/lib/demo-data";
 import { contributionTiers } from "@/lib/event";
 
 export const dynamic = "force-dynamic";
 export default async function DonatePage({ searchParams }: { searchParams: Promise<{ tier?: string }> }) {
   const demo = demoModeEnabled();
-  if (demo) await ensureDemoData();
   const locale = await getLocale();
   const t = secondaryMessages(locale).donate;
   const params = await searchParams;

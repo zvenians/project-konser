@@ -5,12 +5,14 @@ Platform tiket dan donasi Symphony of Faith. Branch `codex/full-stack-platform` 
 ## Menjalankan lokal
 
 1. `npm ci`
-2. Salin `.env.example` ke `.env.local`, lalu isi `DATABASE_URL` PostgreSQL dan `APP_URL`.
+2. Salin `.env.example` ke `.env.local`, lalu isi `DATABASE_URL` PostgreSQL dan `APP_URL`. Demo wajib memakai `DEMO_DATABASE_URL` yang berbeda.
 3. `node --env-file=.env.local scripts/migrate.mjs`
 4. Isi `ADMIN_EMAIL`, `ADMIN_NAME`, dan `ADMIN_PASSWORD` (minimal 16 karakter), lalu jalankan `node --env-file=.env.local scripts/create-admin.mjs`.
 5. `npm run dev`
 
-Variabel rahasia disimpan di `.env*.local` atau pengaturan environment Vercel. File tersebut diabaikan Git. Gunakan database terpisah untuk Preview dan pengujian. `scripts/prepare-preview-db.mjs` dapat menyiapkan database `sof_preview` atau `sof_test` pada server PostgreSQL yang sama; jalankan migrasi dengan `DATABASE_URL` yang sesuai.
+Variabel rahasia disimpan di `.env*.local` atau pengaturan environment Vercel. File tersebut diabaikan Git. Produksi dan demo tidak boleh berbagi URL database. Inisialisasi tidak pernah dijalankan saat halaman publik dirender: jalankan migrasi dan `npm run demo:seed` hanya sebagai langkah deployment/admin terkontrol.
+
+Sebelum migrasi produksi, buat backup PostgreSQL yang dapat dipulihkan, verifikasi target, lalu jalankan `DB_TARGET=production CONFIRM_PRODUCTION_MIGRATION=APPLY npm run db:migrate`. Jalankan `npm run db:verify` setelahnya untuk memeriksa migrasi 012–014 dan katalog resmi. Untuk demo gunakan `DB_TARGET=demo DEMO_MODE=true npm run db:migrate`, kemudian `DEMO_MODE=true npm run demo:seed`.
 
 ## Operasi tiket
 
@@ -26,6 +28,8 @@ Variabel rahasia disimpan di `.env*.local` atau pengaturan environment Vercel. F
 `BLOB_READ_WRITE_TOKEN` diperlukan untuk upload lokal. Pada Vercel, penyimpanan Blob yang terhubung dapat memakai OIDC. `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, dan template yang disetujui diperlukan untuk notifikasi WhatsApp. Outbox menyimpan status dan melakukan retry; webhook memverifikasi tanda tangan Meta. Tanpa kredensial, aplikasi tidak mengklaim pesan terkirim.
 
 Pembayaran saat ini memakai verifikasi transfer bank manual. Tidak ada payment gateway otomatis atau bukti transaksi bank yang terhubung. Untuk mengaktifkan transaksi nyata, sediakan rekening resmi dan prosedur verifikasi operasional. PDF tiket resmi beserta manifest, kredensial WhatsApp, dan ID video livestream juga masih diperlukan.
+
+Antarmuka provider untuk pembayaran, notifikasi, penyimpanan privat, dan livestream ada di `lib/providers.ts`. Semua provider produksi tetap `disabled`; kredensial Midtrans, WhatsApp Business API, storage, atau livestream tidak boleh diaktifkan pada lingkungan simulasi.
 
 ## Verifikasi
 

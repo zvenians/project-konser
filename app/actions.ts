@@ -18,12 +18,20 @@ import {
   currentUser,
 } from "@/lib/auth";
 import { demoModeEnabled, requireDemoMode } from "@/lib/demo-config";
-import { DEMO_ACCOUNTS, ensureDemoData, resetDemoData } from "@/lib/demo-data";
+import { DEMO_ACCOUNTS, resetDemoData } from "@/lib/demo-data";
+import { contributionTiers, livestreamPackages, venueClasses } from "@/lib/event";
+import { cartTotal, reservationIsActive } from "@/lib/transactions";
 
 const credentials = z.object({
   email: z.email().max(254),
   password: z.string().min(12).max(128),
 });
+
+const officialCatalog = new Map(
+  [...venueClasses.map((item) => ({ ...item, mode: "VENUE" as const })),
+   ...livestreamPackages.map((item) => ({ ...item, mode: "LIVESTREAM" as const }))]
+    .map((item) => [`${item.mode}:${item.name}`, item]),
+);
 
 export async function register(form: FormData) {
   const demo = demoModeEnabled();
@@ -70,7 +78,6 @@ export async function login(form: FormData) {
 
 export async function demoLogin(form: FormData) {
   requireDemoMode();
-  await ensureDemoData();
   const role = z.enum(["customer", "admin", "finance"]).parse(form.get("role"));
   if (role !== "customer") {
     const expected = process.env.DEMO_ADMIN_CODE ?? "";
@@ -144,11 +151,20 @@ export async function reserve(form: FormData) {
         item.quantity > ticketClass.max_per_order
       )
         throw new Error("Kelas tiket belum tersedia.");
+      const official = officialCatalog.get(`${ticketClass.mode}:${ticketClass.name}`);
+      if (!official || Number(ticketClass.price) !== official.price)
+        throw new Error("Katalog tiket tidak sesuai konfigurasi resmi.");
+      if (
+        ticketClass.mode === "VENUE" &&
+        Number(ticketClass.capacity) !== Number("capacity" in official ? official.capacity : 0)
+      )
+        throw new Error("Kapasitas tiket tidak sesuai konfigurasi resmi.");
       if (ticketClass.mode === "LIVESTREAM" && !ticketClass.streaming_ready)
         throw new Error("Akses livestream belum tersedia.");
       if (ticketClass.mode === "LIVESTREAM") {
+        const purchaseLimit = Number(ticketClass.capacity);
         const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
-        if (item.quantity + Number(usage.total) > Number(ticketClass.capacity))
+        if (item.quantity + Number(usage.total) > purchaseLimit)
           throw new Error("Batas paket livestream sudah tercapai.");
       }
       let ticketIds: string[] = [];
@@ -168,10 +184,7 @@ export async function reserve(form: FormData) {
         mode: ticketClass.mode,
       });
     }
-    const total = prepared.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    );
+    const total = cartTotal(prepared);
     const [order] =
       await tx`INSERT INTO orders(user_id,idempotency_key,total,expires_at,is_demo) VALUES (${user.id},${key},${total},now()+interval '24 hours',${demo}) RETURNING id`;
     for (const item of prepared) {
@@ -197,7 +210,7 @@ export async function simulateDemoPayment(form: FormData) {
   const orderId = z.uuid().parse(form.get("orderId"));
   const outcome = z.enum(["SUCCESS", "FAILED", "CANCELLED"]).parse(form.get("outcome"));
   await db().begin(async (tx) => {
-    const [order] = await tx`SELECT id,user_id,status,total FROM orders WHERE id=${orderId} AND user_id=${user.id} AND is_demo=true FOR UPDATE`;
+    const [order] = await tx`SELECT id,user_id,status,total,expires_at FROM orders WHERE id=${orderId} AND user_id=${user.id} AND is_demo=true FOR UPDATE`;
     if (!order) throw new Error("Pesanan demo tidak ditemukan.");
     const [existing] = await tx`SELECT outcome FROM demo_payments WHERE order_id=${orderId}`;
     if (existing) {
@@ -205,6 +218,14 @@ export async function simulateDemoPayment(form: FormData) {
       return;
     }
     if (order.status !== "PENDING") throw new Error("Pesanan demo sudah diproses.");
+    if (!reservationIsActive(order.status, order.expires_at)) {
+      await tx`UPDATE orders SET status='EXPIRED' WHERE id=${orderId}`;
+      await tx`UPDATE ticket_inventory SET status='AVAILABLE' WHERE is_demo=true AND id IN (SELECT a.ticket_id FROM ticket_allocations a JOIN order_items i ON i.id=a.item_id WHERE i.order_id=${orderId})`;
+      await tx`DELETE FROM ticket_allocations WHERE item_id IN (SELECT id FROM order_items WHERE order_id=${orderId})`;
+      await tx`UPDATE stream_entitlements SET active=false WHERE order_id=${orderId}`;
+      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING','EXPIRED')`;
+      throw new Error("Reservasi demo sudah kedaluwarsa.");
+    }
     await tx`INSERT INTO demo_payments(order_id,outcome,receipt_label) VALUES (${orderId},${outcome},'SIMULATED')`;
     if (outcome === "SUCCESS") {
       await tx`UPDATE orders SET status='CONFIRMED' WHERE id=${orderId}`;
@@ -243,6 +264,10 @@ export async function submitDemoDonation(form: FormData) {
   const name = z.string().trim().min(2).max(100).parse(form.get("name"));
   const key = z.uuid().parse(form.get("idempotencyKey"));
   const tier = z.string().trim().min(2).max(100).optional().parse(form.get("tier") || undefined);
+  const officialTier = tier
+    ? contributionTiers.find((item) => item.name === tier && item.price === amount)
+    : undefined;
+  if (tier && !officialTier) throw new Error("Paket kontribusi tidak valid.");
   const reference = `DEMO-DONATION-${key}`;
   const [campaign] = await db()`SELECT id FROM donation_campaigns ORDER BY id LIMIT 1`;
   const [donation] = await db()`INSERT INTO donations(campaign_id,user_id,donor_name,amount,contribution_tier,payment_reference,bank_reference,anonymous,status,verified_at,is_demo)
@@ -350,6 +375,10 @@ export async function submitDonation(form: FormData) {
     .parse(form.get("amount"));
   const name = z.string().trim().min(2).max(100).parse(form.get("name"));
   const tier = z.string().trim().min(2).max(100).optional().parse(form.get("tier") || undefined);
+  const officialTier = tier
+    ? contributionTiers.find((item) => item.name === tier && item.price === amount)
+    : undefined;
+  if (tier && !officialTier) throw new Error("Paket kontribusi tidak valid.");
   const reference = z
     .string()
     .trim()
@@ -471,7 +500,7 @@ export async function setTicketSale(form: FormData) {
     if (!row) throw new Error("Kelas tiket tidak ditemukan.");
     if (enabled && row.mode === "VENUE") {
       const [stock] =
-        await tx`SELECT count(*)::integer AS total FROM ticket_inventory WHERE class_id=${id} AND status='AVAILABLE'`;
+        await tx`SELECT count(*)::integer AS total FROM ticket_inventory WHERE class_id=${id} AND status='AVAILABLE' AND is_demo=${demoModeEnabled()}`;
       if (stock.total === 0) throw new Error("Belum ada PDF terverifikasi.");
     }
     if (enabled && row.mode === "LIVESTREAM" && !row.streaming_ready)
@@ -517,7 +546,7 @@ export async function setUserRole(form: FormData) {
     if (!target) throw new Error("Pengguna tidak ditemukan.");
     if (target.role === "ADMIN" && role !== "ADMIN") {
       const [count] =
-        await tx`SELECT count(*)::integer AS total FROM users WHERE role='ADMIN'`;
+        await tx`SELECT count(*)::integer AS total FROM users WHERE role='ADMIN' AND is_demo=${demoModeEnabled()}`;
       if (count.total <= 1)
         throw new Error("Admin terakhir tidak dapat diturunkan.");
     }

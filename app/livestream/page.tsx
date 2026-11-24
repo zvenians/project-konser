@@ -6,12 +6,10 @@ import { settingValue } from "@/lib/settings";
 import { getLocale } from "@/lib/i18n";
 import { secondaryMessages } from "@/lib/secondary-messages";
 import { demoModeEnabled } from "@/lib/demo-config";
-import { ensureDemoData } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 export default async function LivestreamPage() {
   const demo = demoModeEnabled();
-  if (demo) await ensureDemoData();
   const t = secondaryMessages(await getLocale()).livestream;
   const user = await currentUser();
   if (!user) redirect("/login");

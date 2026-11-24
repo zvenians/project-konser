@@ -15,7 +15,6 @@ import { contributionTiers, event, livestreamPackages, venueClasses } from "@/li
 import { getLocale, formatEventDate, translate } from "@/lib/i18n";
 import { settingValue } from "@/lib/settings";
 import { demoModeEnabled } from "@/lib/demo-config";
-import { ensureDemoData } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +87,6 @@ const messages = {
 
 export default async function EventPage() {
   const demo = demoModeEnabled();
-  if (demo) await ensureDemoData();
   const locale = await getLocale();
   const t = translate(locale, messages);
   const [classes, settings] = await Promise.all([
