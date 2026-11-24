@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { browserLaunchOptions } from "./browser-launch.mjs";
+import { browserContextOptions, browserLaunchOptions } from "./browser-launch.mjs";
 
 const base = process.env.APP_URL ?? "http://localhost:3230";
 const browser = await chromium.launch(browserLaunchOptions());
-const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+const page = await browser.newPage(browserContextOptions({ viewport: { width: 390, height: 844 } }));
 try {
   await page.goto(`${base}/login`);
   await page.getByRole("button", { name: /Masuk sebagai Demo Customer/i }).click();

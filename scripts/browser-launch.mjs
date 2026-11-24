@@ -7,3 +7,9 @@ export function browserLaunchOptions(extra = {}) {
   const executablePath = configured || (process.platform === "win32" && fs.existsSync(windowsEdge) ? windowsEdge : undefined);
   return { headless: true, ...(executablePath ? { executablePath } : {}), ...extra };
 }
+
+export function browserContextOptions(extra = {}) {
+  const token = process.env.VERCEL_OIDC_TOKEN;
+  const extraHTTPHeaders = token ? { "x-vercel-trusted-oidc-idp-token": token } : undefined;
+  return { ...(extraHTTPHeaders ? { extraHTTPHeaders } : {}), ...extra };
+}

@@ -1,16 +1,19 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { browserLaunchOptions } from "./browser-launch.mjs";
+import { browserContextOptions, browserLaunchOptions } from "./browser-launch.mjs";
 
 const base = process.env.APP_URL ?? "http://localhost:3230";
+const shareUrl = process.env.VERCEL_SHARE_URL;
 const demoAdminCode = process.env.DEMO_ADMIN_CODE;
 assert.ok(demoAdminCode, "DEMO_ADMIN_CODE is required for admin E2E");
 const browser = await chromium.launch(browserLaunchOptions());
 
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const page = await browser.newPage(browserContextOptions({ viewport: { width: 1440, height: 900 } }));
 try {
+  if (shareUrl) await page.goto(shareUrl);
   await page.goto(base);
   await page.locator("[data-demo-preview]").waitFor();
+  await page.getByText(/170 tersedia/).waitFor();
   assert.match(await page.locator("body").innerText(), /170 tersedia/);
   await page.goto(`${base}/login`);
   await page.getByRole("button", { name: /Masuk sebagai Demo Customer/i }).click();
