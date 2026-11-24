@@ -15,7 +15,10 @@ export default async function CheckoutPage() {
   const locale = await getLocale();
   const [user, classes, settings] = await Promise.all([
     currentUser(),
-    db()`SELECT c.id,c.name,c.mode,c.price,c.sale_enabled,e.streaming_ready,count(t.id) FILTER (WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS available FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready`,
+    db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.sale_enabled,e.streaming_ready,
+      count(t.id) FILTER (WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS venue_available,
+      coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')),0) AS stream_reserved
+      FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
   ]);
   const payment = settingValue<{
@@ -29,13 +32,15 @@ export default async function CheckoutPage() {
     name: String(row.name),
     mode: String(row.mode) as "VENUE" | "LIVESTREAM",
     price: Number(row.price),
-    available: row.mode === "VENUE" ? Number(row.available) : 10,
+    available: row.mode === "VENUE"
+      ? Number(row.venue_available)
+      : Math.max(0, Number(row.capacity) - Number(row.stream_reserved)),
     active:
       ready &&
       Boolean(row.sale_enabled) &&
       (row.mode === "VENUE"
-        ? Number(row.available) > 0
-        : Boolean(row.streaming_ready)),
+        ? Number(row.venue_available) > 0
+        : Boolean(row.streaming_ready) && Number(row.capacity) > Number(row.stream_reserved)),
   }));
   return (
     <>

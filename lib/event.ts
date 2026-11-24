@@ -7,13 +7,35 @@ export const event = {
   instagram: "https://www.instagram.com/symphonyoffaithconcert?cnvx=MWN3ZnViYmMwZWtuYw==",
 };
 
-export const officialClasses = [
-  { name: "Platinum", capacity: 70, venuePrice: 2000000, streamPrice: 1000000 },
-  { name: "Gold", capacity: 170, venuePrice: 1000000, streamPrice: 500000 },
-  { name: "Silver", capacity: 270, venuePrice: 500000, streamPrice: 250000 },
-  { name: "Bronze", capacity: 570, venuePrice: 250000, streamPrice: 100000 },
-  { name: "Reguler", capacity: 770, venuePrice: 100000, streamPrice: 50000 },
-];
+export const venueClasses = [
+  { name: "VVIP", capacity: 77, price: 2000000 },
+  { name: "VIP", capacity: 77, price: 1000000 },
+  { name: "GOLD", capacity: 177, price: 500000 },
+  { name: "SILVER", capacity: 577, price: 250000 },
+  { name: "REGULER", capacity: 777, price: 100000 },
+] as const;
+
+export const livestreamPackages = [
+  { name: "Simfoni Iman", price: 2000000 },
+  { name: "Simfoni Agung", price: 1000000 },
+  { name: "Simfoni Harapan", price: 750000 },
+  { name: "Simfoni Pujian", price: 500000 },
+  { name: "Simfoni Syukur", price: 250000 },
+  { name: "Simfoni Kasih", price: 100000 },
+  { name: "Simfoni Setia", price: 50000 },
+] as const;
+
+export const contributionTiers = [
+  { name: "Pilar Iman", price: 2000000 },
+  { name: "Sahabat Pembangunan", price: 1000000 },
+  { name: "Tangan Kasih", price: 750000 },
+  { name: "Iman yang Membangun", price: 500000 },
+  { name: "Benih Berkat", price: 250000 },
+  { name: "Semangat Membangun", price: 100000 },
+] as const;
+
+/** @deprecated Use venueClasses or livestreamPackages for new code. */
+export const officialClasses = venueClasses;
 
 export function countdown(now: number, start = event.startsAt, end = event.endsAt) {
   const seconds = Math.max(0, Math.floor((Date.parse(start) - now) / 1000));

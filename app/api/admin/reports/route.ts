@@ -36,11 +36,12 @@ export async function GET(request: Request) {
         "anonymous",
         "status",
         "amount",
+        "contribution_tier",
         "payment_reference",
         "bank_reference",
       ];
       rows =
-        await db()`SELECT id,created_at,donor_name,anonymous,status,amount,payment_reference,bank_reference FROM donations WHERE is_demo=${demo} ORDER BY created_at DESC`;
+        await db()`SELECT id,created_at,donor_name,anonymous,status,amount,contribution_tier,payment_reference,bank_reference FROM donations WHERE is_demo=${demo} ORDER BY created_at DESC`;
     } else
       return NextResponse.json(
         { error: "Jenis laporan tidak dikenal." },

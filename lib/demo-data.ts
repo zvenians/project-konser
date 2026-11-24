@@ -11,11 +11,11 @@ export const DEMO_ACCOUNTS = {
 export const DEMO_PASSWORD = "DemoPreview2027!";
 
 const stockByClass: Record<string, number> = {
-  Platinum: 70,
-  Gold: 170,
-  Silver: 270,
-  Bronze: 570,
-  Reguler: 770,
+  VVIP: 77,
+  VIP: 77,
+  GOLD: 177,
+  SILVER: 577,
+  REGULER: 777,
 };
 
 async function ensureAccounts() {
@@ -36,7 +36,7 @@ export async function ensureDemoData() {
   requireDemoMode();
   const sql = db();
   const [ready] = await sql`SELECT
-    (SELECT count(*) FROM ticket_inventory WHERE is_demo=true)=1850 AS inventory_ready,
+    (SELECT count(*) FROM ticket_inventory WHERE is_demo=true)=1685 AS inventory_ready,
     (SELECT count(*) FROM users WHERE email = ANY(${Object.values(DEMO_ACCOUNTS)}) AND is_demo=true)=3 AS accounts_ready,
     EXISTS(SELECT 1 FROM orders WHERE idempotency_key='00000000-0000-4000-8000-000000000027') AS history_ready`;
   if (ready.inventory_ready && ready.accounts_ready && ready.history_ready) return;
@@ -62,7 +62,7 @@ export async function ensureDemoData() {
     const [customer] = await tx`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS.customer}`;
     const [finance] = await tx`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS.finance}`;
     const [event] = await tx`SELECT id FROM events ORDER BY starts_at LIMIT 1`;
-    const [liveClass] = await tx`SELECT id,price FROM ticket_classes WHERE mode='LIVESTREAM' AND name='Gold' LIMIT 1`;
+    const [liveClass] = await tx`SELECT id,price FROM ticket_classes WHERE mode='LIVESTREAM' AND name='Simfoni Agung' LIMIT 1`;
     const historicalKey = "00000000-0000-4000-8000-000000000027";
     const [historical] = await tx`INSERT INTO orders(user_id,idempotency_key,status,total,expires_at,is_demo,demo_historical)
       VALUES (${finance.id},${historicalKey},'CONFIRMED',${liveClass.price},now()+interval '365 days',true,true)

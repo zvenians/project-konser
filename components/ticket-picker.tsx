@@ -25,7 +25,9 @@ export function TicketPicker({
   options: TicketOption[];
   locale: Locale;
 }) {
-  const [mode, setMode] = useState<"VENUE" | "LIVESTREAM">("VENUE");
+  const [mode, setMode] = useState<"VENUE" | "LIVESTREAM">(
+    options[0]?.mode ?? "VENUE",
+  );
   const [cart, setCart] = useCart();
   const [detail, setDetail] = useState<TicketOption | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -104,9 +106,9 @@ export function TicketPicker({
       <div className="picker-main">
         <div className="picker-heading">
           <h2>{t.title}</h2>
-          <span>10 {locale === "id" ? "jenis tiket" : "ticket types"}</span>
+          <span>{options.length} {locale === "id" ? "pilihan" : "options"}</span>
         </div>
-        <div className="picker-tabs" role="tablist" aria-label={t.title}>
+        {new Set(options.map((option) => option.mode)).size > 1 && <div className="picker-tabs" role="tablist" aria-label={t.title}>
           <button
             type="button"
             role="tab"
@@ -123,7 +125,7 @@ export function TicketPicker({
           >
             {t.stream}
           </button>
-        </div>
+        </div>}
         <div className="picker-rows">
           {rows.map((option) => {
             const quantity = cart[option.id] ?? 0;

@@ -7,13 +7,16 @@ import { getLocale } from "@/lib/i18n";
 import { secondaryMessages } from "@/lib/secondary-messages";
 import { demoModeEnabled } from "@/lib/demo-config";
 import { ensureDemoData } from "@/lib/demo-data";
+import { contributionTiers } from "@/lib/event";
 
 export const dynamic = "force-dynamic";
-export default async function DonatePage() {
+export default async function DonatePage({ searchParams }: { searchParams: Promise<{ tier?: string }> }) {
   const demo = demoModeEnabled();
   if (demo) await ensureDemoData();
   const locale = await getLocale();
   const t = secondaryMessages(locale).donate;
+  const params = await searchParams;
+  const selectedTier = contributionTiers.find((tier) => tier.name === params.tier);
   const [setting] =
     await db()`SELECT value FROM site_settings WHERE key='payment_instructions'`;
   const payment = settingValue<{
@@ -34,8 +37,10 @@ export default async function DonatePage() {
           </div>
           <form className="panel" action={submitDemoDonation}>
             <input type="hidden" name="idempotencyKey" value={randomUUID()} />
+            {selectedTier && <input type="hidden" name="tier" value={selectedTier.name} />}
+            {selectedTier && <p className="selected-contribution">{selectedTier.name} · Rp{selectedTier.price.toLocaleString("id-ID")}</p>}
             <label>{t.donorName}<input name="name" minLength={2} maxLength={100} required /></label>
-            <label>{t.donationAmountRp}<input name="amount" type="number" min={10000} max={100000000} step={1000} required /></label>
+            <label>{t.donationAmountRp}<input name="amount" type="number" min={10000} max={100000000} step={1000} defaultValue={selectedTier?.price} required /></label>
             <label className="check"><input type="checkbox" name="anonymous" /> {t.showMeAsAnonymousIfA}</label>
             <button type="submit">{locale === "id" ? "Simulasikan donasi" : "Simulate donation"}</button>
           </form>
@@ -54,6 +59,8 @@ export default async function DonatePage() {
             <p>{t.enterYourTransferReferenceAfterPayment}</p>
           </div>
           <form className="panel" action={submitDonation}>
+            {selectedTier && <input type="hidden" name="tier" value={selectedTier.name} />}
+            {selectedTier && <p className="selected-contribution">{selectedTier.name} · Rp{selectedTier.price.toLocaleString("id-ID")}</p>}
             <label>
               {t.donorName}
               <input name="name" minLength={2} maxLength={100} required />
@@ -66,6 +73,7 @@ export default async function DonatePage() {
                 min={10000}
                 max={100000000}
                 step={1000}
+                defaultValue={selectedTier?.price}
                 required
               />
             </label>

@@ -69,7 +69,13 @@ export default async function AdminPage({
     users,
     donationHistory,
   ] = await Promise.all([
-    db()`SELECT c.id,c.name,c.mode,c.capacity,c.sale_enabled,count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo}) AS available,count(t.id) FILTER(WHERE t.status='RESERVED' AND t.is_demo=${demo}) AS reserved,count(t.id) FILTER(WHERE t.status='SOLD' AND t.is_demo=${demo}) AS sold FROM ticket_classes c LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id ORDER BY c.mode,c.price DESC`,
+    db()`SELECT c.id,c.name,c.mode,c.capacity,c.sale_enabled,
+      count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo}) AS available,
+      count(t.id) FILTER(WHERE t.status='RESERVED' AND t.is_demo=${demo}) AS reserved,
+      count(t.id) FILTER(WHERE t.status='SOLD' AND t.is_demo=${demo}) AS sold,
+      coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW')),0) AS stream_reserved,
+      coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status='CONFIRMED'),0) AS stream_sold
+      FROM ticket_classes c LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id ORDER BY c.mode,c.price DESC`,
     db()`SELECT o.id,o.status,o.total,o.expires_at,u.name,u.email,p.transfer_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} AND (${q}='' OR u.name ILIKE ${`%${q}%`} OR u.email ILIKE ${`%${q}%`} OR o.id::text ILIKE ${`%${q}%`}) AND (${status}='ALL' OR o.status=${status}) ORDER BY o.created_at DESC LIMIT 25 OFFSET ${offset}`,
     db()`SELECT status,count(*) AS count,coalesce(sum(amount),0) AS total FROM donations WHERE is_demo=${demo} GROUP BY status`,
     db()`SELECT t.id,c.name,t.barcode,t.original_name FROM ticket_inventory t JOIN ticket_classes c ON c.id=t.class_id WHERE t.status='NEEDS_REVIEW' AND t.is_demo=${demo} ORDER BY t.id LIMIT 50`,
@@ -81,7 +87,7 @@ export default async function AdminPage({
     db()`SELECT count(*)::integer AS total FROM ticket_checkins c JOIN ticket_inventory t ON t.id=c.ticket_id WHERE t.is_demo=${demo}`,
     db()`SELECT b.id,b.created_at,count(t.id)::integer AS total,count(t.id) FILTER(WHERE t.status='NEEDS_REVIEW')::integer AS review FROM ticket_import_batches b LEFT JOIN ticket_inventory t ON t.batch_id=b.id AND t.is_demo=${demo} GROUP BY b.id ORDER BY b.created_at DESC LIMIT 20`,
     db()`SELECT id,name,email,role,created_at FROM users WHERE is_demo=${demo} ORDER BY created_at DESC LIMIT 50`,
-    db()`SELECT id,donor_name,anonymous,amount,status,created_at FROM donations WHERE is_demo=${demo} ORDER BY created_at DESC LIMIT 50`,
+    db()`SELECT id,donor_name,anonymous,amount,contribution_tier,status,created_at FROM donations WHERE is_demo=${demo} ORDER BY created_at DESC LIMIT 50`,
   ]);
   const payment = settingValue<{
     bank: string;
@@ -164,9 +170,9 @@ export default async function AdminPage({
                     {row.mode} · {row.name}
                   </th>
                   <td>{row.capacity ?? "—"}</td>
-                  <td>{row.mode === "VENUE" ? row.available : "—"}</td>
-                  <td>{row.reserved}</td>
-                  <td>{row.sold}</td>
+                  <td>{row.mode === "VENUE" ? row.available : Math.max(0, Number(row.capacity) - Number(row.stream_reserved) - Number(row.stream_sold))}</td>
+                  <td>{row.mode === "VENUE" ? row.reserved : row.stream_reserved}</td>
+                  <td>{row.mode === "VENUE" ? row.sold : row.stream_sold}</td>
                   <td>
                     {user.role === "ADMIN" ? (
                       <form action={setTicketSale}>
@@ -472,7 +478,7 @@ export default async function AdminPage({
         <div className="record-list donation-history">
           {donationHistory.map((row) => (
             <div className="record" key={row.id}>
-              <div><strong>{row.anonymous ? (en ? "Anonymous donor" : "Donatur anonim") : row.donor_name}</strong><p>{money(row.amount)} · {secondaryStatus(locale, String(row.status))}</p></div>
+              <div><strong>{row.anonymous ? (en ? "Anonymous donor" : "Donatur anonim") : row.donor_name}</strong><p>{row.contribution_tier ? `${row.contribution_tier} · ` : ""}{money(row.amount)} · {secondaryStatus(locale, String(row.status))}</p></div>
               {demo && <span className="demo-receipt">SIMULATED</span>}
             </div>
           ))}
@@ -562,7 +568,7 @@ export default async function AdminPage({
           {demo && (
             <div className="demo-reset-panel">
               <h3>{en ? "Client demo data" : "Data demo klien"}</h3>
-              <p>{en ? "Restore seeded examples and the official 1,850-ticket inventory." : "Pulihkan contoh awal dan inventaris resmi 1.850 tiket."}</p>
+              <p>{en ? "Restore seeded examples and the official 1,685-ticket venue inventory." : "Pulihkan contoh awal dan inventaris venue resmi 1.685 tiket."}</p>
               <DemoReset locale={locale} />
             </div>
           )}

@@ -11,7 +11,7 @@ import { TicketPicker, type TicketOption } from "@/components/ticket-picker";
 import { ShareButton } from "@/components/share-button";
 import { EventMotion } from "@/components/event-motion";
 import { db } from "@/lib/db";
-import { event, officialClasses } from "@/lib/event";
+import { contributionTiers, event, livestreamPackages, venueClasses } from "@/lib/event";
 import { getLocale, formatEventDate, translate } from "@/lib/i18n";
 import { settingValue } from "@/lib/settings";
 import { demoModeEnabled } from "@/lib/demo-config";
@@ -26,6 +26,12 @@ const messages = {
     time: "Waktu",
     venue: "Lokasi",
     tickets: "Lihat tiket",
+    venueTickets: "Tiket venue",
+    venueTicketsText: "Pilih kursi untuk hadir langsung di Tiara Convention Hall.",
+    livestreamPackages: "Paket livestream",
+    livestreamPackagesText: "Nikmati siaran konser dari mana saja dengan akses digital terpisah.",
+    contributionProgram: "Program kontribusi",
+    contributionProgramText: "Dukung karya dan pelayanan melalui kontribusi yang terpisah dari pembelian tiket.",
     share: "Bagikan",
     about: "Tentang acara",
     aboutText:
@@ -52,6 +58,12 @@ const messages = {
     time: "Time",
     venue: "Venue",
     tickets: "View tickets",
+    venueTickets: "Venue tickets",
+    venueTicketsText: "Choose your seat for an in-person experience at Tiara Convention Hall.",
+    livestreamPackages: "Livestream packages",
+    livestreamPackagesText: "Join the concert from anywhere with separate digital access.",
+    contributionProgram: "Contribution program",
+    contributionProgramText: "Support the work and ministry through a contribution separate from ticket purchases.",
     share: "Share",
     about: "About the event",
     aboutText:
@@ -80,7 +92,10 @@ export default async function EventPage() {
   const locale = await getLocale();
   const t = translate(locale, messages);
   const [classes, settings] = await Promise.all([
-    db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.sale_enabled,e.streaming_ready,count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS available FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready ORDER BY c.price DESC`,
+    db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.sale_enabled,e.streaming_ready,
+      count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS venue_available,
+      coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')),0) AS stream_reserved
+      FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready ORDER BY c.price DESC`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
   ]);
   const payment = settingValue<{
@@ -90,35 +105,31 @@ export default async function EventPage() {
   }>(settings[0]?.value);
   const paymentReady =
     demo || Boolean(payment?.bank && payment.account && payment.holder);
-  const options: TicketOption[] = (["VENUE", "LIVESTREAM"] as const).flatMap(
-    (mode) =>
-      officialClasses.map((item) => {
+  const optionsFor = (mode: "VENUE" | "LIVESTREAM", catalogue: ReadonlyArray<{ name: string; price: number; capacity?: number }>): TicketOption[] =>
+    catalogue.map((item) => {
         const row = classes.find(
           (c) => c.name === item.name && c.mode === mode,
         );
-        const available = mode === "VENUE" ? Number(row?.available ?? 0) : 10;
+        const capacity = mode === "VENUE" ? item.capacity ?? 0 : Number(row?.capacity ?? 0);
+        const available = mode === "VENUE"
+          ? Number(row?.venue_available ?? 0)
+          : Math.max(0, capacity - Number(row?.stream_reserved ?? 0));
         return {
           id: String(row?.id ?? ""),
           name: item.name,
           mode,
-          price: Number(
-            row?.price ??
-              (mode === "VENUE" ? item.venuePrice : item.streamPrice),
-          ),
-          capacity: mode === "VENUE" ? item.capacity : null,
+          price: Number(row?.price ?? item.price),
+          capacity,
           available,
           active:
             paymentReady &&
             Boolean(row?.sale_enabled) &&
-            (mode === "VENUE" ? available > 0 : Boolean(row?.streaming_ready)),
-          soldOut:
-            mode === "VENUE" &&
-            paymentReady &&
-            Boolean(row?.sale_enabled) &&
-            available === 0,
+            available > 0 && (mode === "VENUE" || Boolean(row?.streaming_ready)),
+          soldOut: paymentReady && Boolean(row?.sale_enabled) && available === 0,
         };
-      }),
-  );
+    });
+  const venueOptions = optionsFor("VENUE", venueClasses);
+  const streamOptions = optionsFor("LIVESTREAM", livestreamPackages);
   return (
     <>
       <EventMotion />
@@ -188,8 +199,37 @@ export default async function EventPage() {
               </div>
             </div>
           </section>
-          <section id="tickets" className="event-tickets">
-            <TicketPicker options={options} locale={locale} />
+          <section id="tickets" className="event-tickets product-section">
+            <div className="product-section-intro">
+              <p className="eyebrow">01 / {t.venueTickets}</p>
+              <h2>{t.venueTickets}</h2>
+              <p>{t.venueTicketsText}</p>
+            </div>
+            <TicketPicker options={venueOptions} locale={locale} />
+          </section>
+          <section id="livestream" className="event-tickets product-section">
+            <div className="product-section-intro">
+              <p className="eyebrow">02 / LIVESTREAM</p>
+              <h2>{t.livestreamPackages}</h2>
+              <p>{t.livestreamPackagesText}</p>
+            </div>
+            <TicketPicker options={streamOptions} locale={locale} />
+          </section>
+          <section id="contributions" className="contribution-section">
+            <div className="product-section-intro">
+              <p className="eyebrow">03 / {t.donate}</p>
+              <h2>{t.contributionProgram}</h2>
+              <p>{t.contributionProgramText}</p>
+            </div>
+            <div className="contribution-tier-grid">
+              {contributionTiers.map((tier) => (
+                <Link href={`/donate?tier=${encodeURIComponent(tier.name)}`} className="contribution-tier" key={tier.name}>
+                  <span>{tier.name}</span>
+                  <strong>Rp{tier.price.toLocaleString("id-ID")}</strong>
+                </Link>
+              ))}
+            </div>
+            <Link href="/donate" className="event-cta">{t.donateAction}</Link>
           </section>
           <div className="event-lower">
             <section id="information" className="event-info">

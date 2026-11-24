@@ -146,6 +146,11 @@ export async function reserve(form: FormData) {
         throw new Error("Kelas tiket belum tersedia.");
       if (ticketClass.mode === "LIVESTREAM" && !ticketClass.streaming_ready)
         throw new Error("Akses livestream belum tersedia.");
+      if (ticketClass.mode === "LIVESTREAM") {
+        const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
+        if (item.quantity + Number(usage.total) > Number(ticketClass.capacity))
+          throw new Error("Batas paket livestream sudah tercapai.");
+      }
       let ticketIds: string[] = [];
       if (ticketClass.mode === "VENUE") {
         const rows =
@@ -237,10 +242,11 @@ export async function submitDemoDonation(form: FormData) {
   const amount = z.coerce.number().int().min(10000).max(100000000).parse(form.get("amount"));
   const name = z.string().trim().min(2).max(100).parse(form.get("name"));
   const key = z.uuid().parse(form.get("idempotencyKey"));
+  const tier = z.string().trim().min(2).max(100).optional().parse(form.get("tier") || undefined);
   const reference = `DEMO-DONATION-${key}`;
   const [campaign] = await db()`SELECT id FROM donation_campaigns ORDER BY id LIMIT 1`;
-  const [donation] = await db()`INSERT INTO donations(campaign_id,user_id,donor_name,amount,payment_reference,bank_reference,anonymous,status,verified_at,is_demo)
-    VALUES (${campaign.id},${user?.id ?? null},${name},${amount},${reference},${`SIMULATED-${key}`},${form.get("anonymous") === "on"},'VERIFIED',now(),true)
+  const [donation] = await db()`INSERT INTO donations(campaign_id,user_id,donor_name,amount,contribution_tier,payment_reference,bank_reference,anonymous,status,verified_at,is_demo)
+    VALUES (${campaign.id},${user?.id ?? null},${name},${amount},${tier ?? null},${reference},${`SIMULATED-${key}`},${form.get("anonymous") === "on"},'VERIFIED',now(),true)
     ON CONFLICT(payment_reference) DO UPDATE SET payment_reference=excluded.payment_reference RETURNING id`;
   redirect(`/donations/${donation.id}?demo=1`);
 }
@@ -343,6 +349,7 @@ export async function submitDonation(form: FormData) {
     .max(100000000)
     .parse(form.get("amount"));
   const name = z.string().trim().min(2).max(100).parse(form.get("name"));
+  const tier = z.string().trim().min(2).max(100).optional().parse(form.get("tier") || undefined);
   const reference = z
     .string()
     .trim()
@@ -353,7 +360,7 @@ export async function submitDonation(form: FormData) {
     await db()`SELECT id FROM donation_campaigns ORDER BY id LIMIT 1`;
   if (!campaign) throw new Error("Program donasi belum dibuka.");
   const [donation] =
-    await db()`INSERT INTO donations(campaign_id,donor_name,amount,payment_reference,anonymous) VALUES (${campaign.id},${name},${amount},${reference},${form.get("anonymous") === "on"}) RETURNING id`;
+    await db()`INSERT INTO donations(campaign_id,donor_name,amount,contribution_tier,payment_reference,anonymous) VALUES (${campaign.id},${name},${amount},${tier ?? null},${reference},${form.get("anonymous") === "on"}) RETURNING id`;
   redirect(`/donations/${donation.id}`);
 }
 

@@ -1,11 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { countdown, officialClasses } from "../lib/event.ts";
+import { countdown, livestreamPackages, venueClasses } from "../lib/event.ts";
 
-test("official venue capacity and ticket prices",()=>{
-  assert.equal(officialClasses.reduce((sum,item)=>sum+item.capacity,0),1850);
-  assert.deepEqual(officialClasses.map(item=>item.venuePrice),[2000000,1000000,500000,250000,100000]);
-  assert.deepEqual(officialClasses.map(item=>item.streamPrice),[1000000,500000,250000,100000,50000]);
+test("official venue categories, capacity, and prices",()=>{
+  assert.equal(venueClasses.reduce((sum,item)=>sum+item.capacity,0),1685);
+  assert.deepEqual(venueClasses.map(item=>item.name),["VVIP","VIP","GOLD","SILVER","REGULER"]);
+  assert.deepEqual(venueClasses.map(item=>item.price),[2000000,1000000,500000,250000,100000]);
+});
+test("livestream packages remain distinct from venue categories",()=>{
+  assert.deepEqual(livestreamPackages.map(item=>item.name),["Simfoni Iman","Simfoni Agung","Simfoni Harapan","Simfoni Pujian","Simfoni Syukur","Simfoni Kasih","Simfoni Setia"]);
+  assert.deepEqual(livestreamPackages.map(item=>item.price),[2000000,1000000,750000,500000,250000,100000,50000]);
 });
 test("WIB start, live and ended phases",()=>{
   const start=Date.parse("2027-02-07T12:00:00Z");

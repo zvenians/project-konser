@@ -13,24 +13,24 @@ try {
   if (shareUrl) await page.goto(shareUrl);
   await page.goto(base);
   await page.locator("[data-demo-preview]").waitFor();
-  await page.getByText(/170 tersedia/).waitFor();
-  assert.match(await page.locator("body").innerText(), /170 tersedia/);
+  await page.getByText(/77 tersedia/).first().waitFor();
+  assert.match(await page.locator("body").innerText(), /77 tersedia/);
   await page.goto(`${base}/login`);
   await page.getByRole("button", { name: /Masuk sebagai Demo Customer/i }).click();
   await page.waitForURL("**/account");
 
   await page.goto(`${base}/#tickets`);
-  const gold = page.locator(".picker-row").filter({ hasText: "Gold" }).first();
-  const beforeText = await gold.innerText();
+  const vip = page.locator(".picker-row").filter({ has: page.getByRole("heading", { name: "VIP", exact: true }) }).first();
+  const beforeText = await vip.innerText();
   const before = Number(beforeText.match(/(\d+) tersedia/)?.[1]);
-  await gold.getByRole("button", { name: "+ Gold" }).click();
-  await gold.getByRole("button", { name: "+ Gold" }).click();
+  await vip.getByRole("button", { name: "+ VIP" }).click();
+  await vip.getByRole("button", { name: "+ VIP" }).click();
   await page.getByRole("link", { name: /Lanjut ke checkout/i }).click();
   await page.getByRole("heading", { name: /Tiket pilihan Anda/i }).waitFor();
-  assert.match(await page.locator("body").innerText(), /2 × Gold/);
-  await page.getByRole("button", { name: /Buat reservasi/i }).click();
+  assert.match(await page.locator("body").innerText(), /2 × VIP/);
+  await page.getByRole("button", { name: /Buat reservasi|Reserve tickets/i }).click();
   await page.waitForURL("**/account?reserved=1");
-  await page.getByRole("button", { name: /Bayar berhasil/i }).first().click();
+  await page.getByRole("button", { name: /Bayar berhasil|Pay Successfully/i }).first().click();
   await page.waitForURL("**/account?demoPayment=success");
   await page.getByText("SIMULATED", { exact: false }).first().waitFor();
   const ticketLinks = page.getByRole("link", { name: /Unduh tiket demo/i });
@@ -48,7 +48,7 @@ try {
   }
 
   await page.goto(`${base}/#tickets`);
-  const afterText = await page.locator(".picker-row").filter({ hasText: "Gold" }).first().innerText();
+  const afterText = await page.locator(".picker-row").filter({ has: page.getByRole("heading", { name: "VIP", exact: true }) }).first().innerText();
   const after = Number(afterText.match(/(\d+) tersedia/)?.[1]);
   assert.equal(after, before - 2);
 
@@ -70,14 +70,13 @@ try {
   await page.goto(`${base}/login`);
   await page.getByRole("button", { name: /Masuk sebagai Demo Customer/i }).click();
   await page.waitForURL("**/account");
-  await page.goto(`${base}/#tickets`);
-  await page.getByRole("tab", { name: "Livestream" }).click();
-  const liveGold = page.locator(".picker-row").filter({ hasText: "Gold" }).first();
-  await liveGold.getByRole("button", { name: "+ Gold" }).click();
+  await page.goto(`${base}/#livestream`);
+  const liveAgung = page.locator(".picker-row").filter({ hasText: "Simfoni Agung" }).first();
+  await liveAgung.getByRole("button", { name: "+ Simfoni Agung" }).click();
   await page.getByRole("link", { name: /Lanjut ke checkout/i }).click();
-  await page.getByRole("button", { name: /Buat reservasi/i }).click();
+  await page.getByRole("button", { name: /Buat reservasi|Reserve tickets/i }).click();
   await page.waitForURL("**/account?reserved=1");
-  await page.getByRole("button", { name: /Bayar berhasil/i }).first().click();
+  await page.getByRole("button", { name: /Bayar berhasil|Pay Successfully/i }).first().click();
   await page.waitForURL("**/account?demoPayment=success");
   await page.goto(`${base}/livestream`);
   await page.locator("video[data-demo-stream]").waitFor();
@@ -94,24 +93,24 @@ try {
   assert.match(await page.locator("body").innerText(), /SIMULATED/);
 
   await page.goto(`${base}/#tickets`);
-  const bronze = page.locator(".picker-row").filter({ hasText: "Bronze" }).first();
-  const bronzeBefore = Number((await bronze.innerText()).match(/(\d+) tersedia/)?.[1]);
-  await bronze.getByRole("button", { name: "+ Bronze" }).click();
+  const silver = page.locator(".picker-row").filter({ hasText: "SILVER" }).first();
+  const silverBefore = Number((await silver.innerText()).match(/(\d+) tersedia/)?.[1]);
+  await silver.getByRole("button", { name: "+ SILVER" }).click();
   await page.locator(".event-nav-actions .language-switch").getByRole("button", { name: "EN" }).click();
   await page.waitForLoadState("networkidle");
-  assert.match(await page.locator("body").innerText(), /1 × Bronze/);
+  assert.match(await page.locator("body").innerText(), /1 × SILVER/);
   await page.getByRole("link", { name: /Continue to checkout/i }).click();
   await page.locator(".event-nav-actions .language-switch").getByRole("button", { name: "ID" }).click();
   await page.waitForLoadState("networkidle");
-  assert.match(await page.locator("body").innerText(), /1 × Bronze/);
-  await page.getByRole("button", { name: /Buat reservasi/i }).click();
+  assert.match(await page.locator("body").innerText(), /1 × SILVER/);
+  await page.getByRole("button", { name: /Buat reservasi|Reserve tickets/i }).click();
   await page.waitForURL("**/account?reserved=1");
-  await page.getByRole("button", { name: /pembayaran gagal/i }).first().click();
+  await page.getByRole("button", { name: /pembayaran gagal|Simulate Failed Payment/i }).first().click();
   await page.waitForURL("**/account?demoPayment=failed");
   assert.equal(await page.getByRole("link", { name: /Unduh tiket demo/i }).count(), 2);
   await page.goto(`${base}/#tickets`);
-  const bronzeAfter = Number((await page.locator(".picker-row").filter({ hasText: "Bronze" }).first().innerText()).match(/(\d+) tersedia/)?.[1]);
-  assert.equal(bronzeAfter, bronzeBefore);
+  const silverAfter = Number((await page.locator(".picker-row").filter({ hasText: "SILVER" }).first().innerText()).match(/(\d+) tersedia/)?.[1]);
+  assert.equal(silverAfter, silverBefore);
 
   await page.goto(`${base}/login`);
   const finalAdminLogin = page.locator("form").filter({ hasText: "Demo Administrator" });
@@ -124,11 +123,11 @@ try {
   await page.getByRole("button", { name: /Konfirmasi reset/i }).click();
   await page.waitForURL("**/admin?demoReset=1");
   await page.goto(`${base}/#tickets`);
-  assert.match(await page.locator(".picker-row").filter({ hasText: "Gold" }).first().innerText(), /170 tersedia/);
+  assert.match(await page.locator(".picker-row").filter({ has: page.getByRole("heading", { name: "VIP", exact: true }) }).first().innerText(), /77 tersedia/);
   console.log(JSON.stringify({
     result: "all-demo-scenarios-passed",
     venueStock: { before, after },
-    failedPaymentReleased: bronzeAfter === bronzeBefore,
+    failedPaymentReleased: silverAfter === silverBefore,
   }));
 } finally {
   await browser.close();
