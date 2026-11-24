@@ -11,6 +11,7 @@ test("demo and production databases are isolated", () => {
   const demo = "postgres://demo";
   assert.equal(resolveDatabaseUrl({ DATABASE_URL: production, DEMO_MODE: "false" }), production);
   assert.equal(resolveDatabaseUrl({ DATABASE_URL: production, DEMO_DATABASE_URL: demo, DEMO_MODE: "true", NODE_ENV: "test" }), demo);
+  assert.equal(resolveDatabaseUrl({ DATABASE_URL: production, DEMO_DATABASE_DATABASE_URL: demo, DEMO_MODE: "true", VERCEL_ENV: "preview" }), demo);
   assert.throws(() => resolveDatabaseUrl({ DATABASE_URL: production, DEMO_DATABASE_URL: production, DEMO_MODE: "true", NODE_ENV: "test" }));
 });
 
