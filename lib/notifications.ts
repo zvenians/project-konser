@@ -11,12 +11,12 @@ export async function processNotifications(limit = 20) {
   if (!/^v\d+\.\d+$/.test(version) || !/^\d+$/.test(phoneId))
     throw new Error("Konfigurasi WhatsApp tidak valid.");
   const sql = db();
-  await sql`UPDATE notification_outbox SET status='QUEUED',next_attempt_at=now() WHERE status='SENDING' AND locked_at<now()-interval '10 minutes'`;
+  await sql`UPDATE notification_outbox n SET status='QUEUED',next_attempt_at=now() WHERE n.status='SENDING' AND n.locked_at<now()-interval '10 minutes' AND EXISTS(SELECT 1 FROM orders o WHERE o.id=n.order_id AND o.is_demo=false)`;
   let processed = 0;
   for (let index = 0; index < limit; index++) {
     const row = await sql.begin(async (tx) => {
       const [job] =
-        await tx`SELECT n.id,n.kind,u.phone,u.whatsapp_consent_at FROM notification_outbox n JOIN users u ON u.id=n.user_id WHERE n.status='QUEUED' AND n.next_attempt_at<=now() ORDER BY n.next_attempt_at FOR UPDATE OF n SKIP LOCKED LIMIT 1`;
+        await tx`SELECT n.id,n.kind,u.phone,u.whatsapp_consent_at FROM notification_outbox n JOIN users u ON u.id=n.user_id JOIN orders o ON o.id=n.order_id WHERE n.status='QUEUED' AND n.next_attempt_at<=now() AND u.is_demo=false AND o.is_demo=false ORDER BY n.next_attempt_at FOR UPDATE OF n SKIP LOCKED LIMIT 1`;
       if (!job) return null;
       await tx`UPDATE notification_outbox SET status='SENDING',locked_at=now(),attempts=attempts+1 WHERE id=${job.id}`;
       return job;

@@ -1,6 +1,7 @@
 "use server";
 
 import { compare, hash } from "bcryptjs";
+import { timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -11,10 +12,13 @@ import {
   endSession,
   requireAdmin,
   requireFinance,
+  requireCheckIn,
+  requireStreamOperator,
   requireUser,
+  currentUser,
 } from "@/lib/auth";
 import { demoModeEnabled, requireDemoMode } from "@/lib/demo-config";
-import { DEMO_ACCOUNTS, ensureDemoData } from "@/lib/demo-data";
+import { DEMO_ACCOUNTS, ensureDemoData, resetDemoData } from "@/lib/demo-data";
 
 const credentials = z.object({
   email: z.email().max(254),
@@ -68,6 +72,12 @@ export async function demoLogin(form: FormData) {
   requireDemoMode();
   await ensureDemoData();
   const role = z.enum(["customer", "admin", "finance"]).parse(form.get("role"));
+  if (role !== "customer") {
+    const expected = process.env.DEMO_ADMIN_CODE ?? "";
+    const supplied = String(form.get("accessCode") ?? "");
+    const valid = expected.length > 0 && supplied.length === expected.length && timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+    if (!valid) throw new Error("Kode akses demo tidak valid.");
+  }
   const [user] = await db()`SELECT id FROM users WHERE email=${DEMO_ACCOUNTS[role]} AND is_demo=true`;
   if (!user) throw new Error("Akun demo tidak tersedia.");
   await createSession(user.id);
@@ -220,6 +230,21 @@ export async function simulateDemoPayment(form: FormData) {
   redirect(`/account?demoPayment=${outcome.toLowerCase()}`);
 }
 
+export async function submitDemoDonation(form: FormData) {
+  requireDemoMode();
+  const user = await currentUser();
+  if (user && !user.is_demo) throw new Error("Akun ini bukan akun demo.");
+  const amount = z.coerce.number().int().min(10000).max(100000000).parse(form.get("amount"));
+  const name = z.string().trim().min(2).max(100).parse(form.get("name"));
+  const key = z.uuid().parse(form.get("idempotencyKey"));
+  const reference = `DEMO-DONATION-${key}`;
+  const [campaign] = await db()`SELECT id FROM donation_campaigns ORDER BY id LIMIT 1`;
+  const [donation] = await db()`INSERT INTO donations(campaign_id,user_id,donor_name,amount,payment_reference,bank_reference,anonymous,status,verified_at,is_demo)
+    VALUES (${campaign.id},${user?.id ?? null},${name},${amount},${reference},${`SIMULATED-${key}`},${form.get("anonymous") === "on"},'VERIFIED',now(),true)
+    ON CONFLICT(payment_reference) DO UPDATE SET payment_reference=excluded.payment_reference RETURNING id`;
+  redirect(`/donations/${donation.id}?demo=1`);
+}
+
 export async function releaseExpired() {
   await requireAdmin();
   await expireReservations();
@@ -266,6 +291,7 @@ export async function cancelOrder(form: FormData) {
 
 export async function confirmOrder(form: FormData) {
   const admin = await requireFinance();
+  const demo = demoModeEnabled();
   const id = z.uuid().parse(form.get("orderId"));
   const bankReference = z
     .string()
@@ -282,7 +308,7 @@ export async function confirmOrder(form: FormData) {
     throw new Error("Periksa mutasi rekening sebelum verifikasi.");
   await db().begin(async (tx) => {
     const [order] =
-      await tx`SELECT id,user_id,status,expires_at,total FROM orders WHERE id=${id} FOR UPDATE`;
+      await tx`SELECT id,user_id,status,expires_at,total FROM orders WHERE id=${id} AND is_demo=${demo} FOR UPDATE`;
     if (
       !order ||
       order.status !== "PAYMENT_REVIEW" ||
@@ -333,14 +359,15 @@ export async function submitDonation(form: FormData) {
 
 export async function verifyTicket(form: FormData) {
   const admin = await requireAdmin();
+  const demo = demoModeEnabled();
   const id = z.uuid().parse(form.get("ticketId"));
   await db().begin(async (tx) => {
     const [ticket] =
-      await tx`SELECT t.id,t.class_id,t.status,c.capacity FROM ticket_inventory t JOIN ticket_classes c ON c.id=t.class_id WHERE t.id=${id} FOR UPDATE OF t,c`;
+      await tx`SELECT t.id,t.class_id,t.status,c.capacity FROM ticket_inventory t JOIN ticket_classes c ON c.id=t.class_id WHERE t.id=${id} AND t.is_demo=${demo} FOR UPDATE OF t,c`;
     if (!ticket || ticket.status !== "NEEDS_REVIEW")
       throw new Error("Tiket tidak dapat diverifikasi.");
     const [counts] =
-      await tx`SELECT count(*)::integer AS total FROM ticket_inventory WHERE class_id=${ticket.class_id} AND status IN ('AVAILABLE','RESERVED','SOLD')`;
+      await tx`SELECT count(*)::integer AS total FROM ticket_inventory WHERE class_id=${ticket.class_id} AND status IN ('AVAILABLE','RESERVED','SOLD') AND is_demo=${demo}`;
     if (counts.total >= ticket.capacity)
       throw new Error("Kapasitas resmi sudah penuh.");
     await tx`UPDATE ticket_inventory SET status='AVAILABLE',verified_at=now() WHERE id=${id}`;
@@ -351,6 +378,7 @@ export async function verifyTicket(form: FormData) {
 
 export async function verifyDonation(form: FormData) {
   const admin = await requireFinance();
+  const demo = demoModeEnabled();
   const id = z.uuid().parse(form.get("donationId"));
   const bankReference = z
     .string()
@@ -367,7 +395,7 @@ export async function verifyDonation(form: FormData) {
     throw new Error("Periksa mutasi rekening sebelum verifikasi.");
   await db().begin(async (tx) => {
     const [pending] =
-      await tx`SELECT amount FROM donations WHERE id=${id} AND status='PENDING' AND expires_at>now() AND payment_reference IS NOT NULL FOR UPDATE`;
+      await tx`SELECT amount FROM donations WHERE id=${id} AND status='PENDING' AND expires_at>now() AND payment_reference IS NOT NULL AND is_demo=${demo} FOR UPDATE`;
     if (!pending || Number(pending.amount) !== receivedAmount)
       throw new Error("Jumlah transfer tidak cocok dengan donasi.");
     await tx`INSERT INTO bank_receipts(bank_reference,amount,source_type,source_id,recorded_by) VALUES (${bankReference},${receivedAmount},'DONATION',${id},${admin.id})`;
@@ -411,7 +439,7 @@ export async function configureStream(form: FormData) {
 
 export async function setDemoStreamState(form: FormData) {
   requireDemoMode();
-  const admin = await requireAdmin();
+  const admin = await requireStreamOperator();
   const state = z.enum(["NOT_STARTED", "LIVE", "ENDED"]).parse(form.get("state"));
   const value = JSON.stringify({
     state,
@@ -448,11 +476,12 @@ export async function setTicketSale(form: FormData) {
 }
 
 export async function checkInTicket(form: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireCheckIn();
+  const demo = demoModeEnabled();
   const barcode = z.string().trim().min(3).max(512).parse(form.get("barcode"));
   await db().begin(async (tx) => {
     const [ticket] =
-      await tx`SELECT t.id,t.status,o.status AS order_status FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id WHERE t.barcode=${barcode} FOR UPDATE OF t`;
+      await tx`SELECT t.id,t.status,o.status AS order_status FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id WHERE t.barcode=${barcode} AND t.is_demo=${demo} AND o.is_demo=${demo} FOR UPDATE OF t`;
     if (
       !ticket ||
       ticket.status !== "SOLD" ||
@@ -471,13 +500,13 @@ export async function checkInTicket(form: FormData) {
 export async function setUserRole(form: FormData) {
   const admin = await requireAdmin();
   const userId = z.uuid().parse(form.get("userId"));
-  const role = z.enum(["CUSTOMER", "FINANCE", "ADMIN"]).parse(form.get("role"));
+  const role = z.enum(["CUSTOMER", "FINANCE", "CHECK_IN", "STREAM_OPERATOR", "ADMIN"]).parse(form.get("role"));
   if (userId === admin.id && role !== "ADMIN")
     throw new Error("Anda tidak dapat menurunkan peran akun sendiri.");
   await db().begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(427312)`;
     const [target] =
-      await tx`SELECT role FROM users WHERE id=${userId} FOR UPDATE`;
+      await tx`SELECT role FROM users WHERE id=${userId} AND is_demo=${demoModeEnabled()} FOR UPDATE`;
     if (!target) throw new Error("Pengguna tidak ditemukan.");
     if (target.role === "ADMIN" && role !== "ADMIN") {
       const [count] =
@@ -489,4 +518,11 @@ export async function setUserRole(form: FormData) {
     await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${admin.id},'SET_USER_ROLE',${userId},${JSON.stringify({ from: target.role, to: role })}::jsonb)`;
   });
   redirect("/admin#users");
+}
+
+export async function resetDemoDataAction() {
+  requireDemoMode();
+  await requireAdmin();
+  await resetDemoData();
+  redirect("/admin?demoReset=1");
 }

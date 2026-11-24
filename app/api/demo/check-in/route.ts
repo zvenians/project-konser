@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requireCheckIn } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requireDemoMode } from "@/lib/demo-config";
 
 export async function POST(request: Request) {
   try {
     requireDemoMode();
-    const admin = await requireAdmin();
+    const admin = await requireCheckIn();
     const input = z.object({ barcode: z.string().trim().min(3).max(512) }).parse(await request.json());
     const result = await db().begin(async (tx) => {
       const [ticket] = await tx`SELECT t.id,t.status,o.status AS order_status FROM ticket_inventory t LEFT JOIN ticket_allocations a ON a.ticket_id=t.id LEFT JOIN order_items i ON i.id=a.item_id LEFT JOIN orders o ON o.id=i.order_id WHERE t.barcode=${input.barcode} AND t.is_demo=true FOR UPDATE OF t`;

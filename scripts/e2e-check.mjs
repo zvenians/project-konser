@@ -3,17 +3,14 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import { browserLaunchOptions } from "./browser-launch.mjs";
 import postgres from "postgres";
 
 if (!process.env.DATABASE_URL?.includes("/sof_test?"))
   throw new Error("E2E hanya boleh memakai sof_test");
 const base = process.env.APP_URL ?? "http://localhost:3220";
 const sql = postgres(process.env.DATABASE_URL, { max: 3, prepare: false });
-const browser = await chromium.launch({
-  executablePath:
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  headless: true,
-});
+const browser = await chromium.launch(browserLaunchOptions());
 async function waitForStatus(table, id, expected) {
   for (let attempt = 0; attempt < 30; attempt++) {
     const [record] = await sql.unsafe(

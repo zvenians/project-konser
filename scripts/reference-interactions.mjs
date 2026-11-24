@@ -1,11 +1,8 @@
 import { chromium } from "playwright";
+import { browserLaunchOptions } from "./browser-launch.mjs";
 import fs from "node:fs/promises";
 
-const browser = await chromium.launch({
-  executablePath:
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  headless: true,
-});
+const browser = await chromium.launch(browserLaunchOptions());
 const results = [];
 for (const [width, height] of [
   [1440, 900],

@@ -20,13 +20,18 @@ import { secondaryMessages, secondaryStatus } from "@/lib/secondary-messages";
 import { demoModeEnabled } from "@/lib/demo-config";
 import { ensureDemoData } from "@/lib/demo-data";
 import { DemoCheckIn } from "@/components/demo-check-in";
+import { DemoReset } from "@/components/demo-reset";
 
 const money = (value: number | string) =>
   `Rp${Number(value).toLocaleString("id-ID")}`;
+const messagePreview = (value: unknown) => {
+  if (!value || typeof value !== "object") return null;
+  return value as { title?: string; body?: string; tickets?: Array<{ name: string; url: string }> };
+};
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; demoReset?: string }>;
 }) {
   const locale = await getLocale();
   const demo = demoModeEnabled();
@@ -34,15 +39,18 @@ export default async function AdminPage({
   const en = locale === "en";
   const t = secondaryMessages(locale).admin;
   const user = await currentUser();
-  if (!user || !["ADMIN", "FINANCE"].includes(user.role)) redirect("/login");
+  if (!user || !["ADMIN", "FINANCE", "CHECK_IN", "STREAM_OPERATOR"].includes(user.role)) redirect("/login");
   const params = await searchParams;
   const q = (params.q ?? "").trim().slice(0, 100);
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const offset = (page - 1) * 25;
   const status = [
     "PENDING",
     "PAYMENT_REVIEW",
     "CONFIRMED",
     "CANCELLED",
     "EXPIRED",
+    "FAILED",
   ].includes(params.status ?? "")
     ? params.status!
     : "ALL";
@@ -59,19 +67,21 @@ export default async function AdminPage({
     checkins,
     batches,
     users,
+    donationHistory,
   ] = await Promise.all([
     db()`SELECT c.id,c.name,c.mode,c.capacity,c.sale_enabled,count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo}) AS available,count(t.id) FILTER(WHERE t.status='RESERVED' AND t.is_demo=${demo}) AS reserved,count(t.id) FILTER(WHERE t.status='SOLD' AND t.is_demo=${demo}) AS sold FROM ticket_classes c LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id ORDER BY c.mode,c.price DESC`,
-    db()`SELECT o.id,o.status,o.total,o.expires_at,u.name,u.email,p.transfer_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} AND (${q}='' OR u.name ILIKE ${`%${q}%`} OR u.email ILIKE ${`%${q}%`} OR o.id::text ILIKE ${`%${q}%`}) AND (${status}='ALL' OR o.status=${status}) ORDER BY o.created_at DESC LIMIT 100`,
+    db()`SELECT o.id,o.status,o.total,o.expires_at,u.name,u.email,p.transfer_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} AND (${q}='' OR u.name ILIKE ${`%${q}%`} OR u.email ILIKE ${`%${q}%`} OR o.id::text ILIKE ${`%${q}%`}) AND (${status}='ALL' OR o.status=${status}) ORDER BY o.created_at DESC LIMIT 25 OFFSET ${offset}`,
     db()`SELECT status,count(*) AS count,coalesce(sum(amount),0) AS total FROM donations WHERE is_demo=${demo} GROUP BY status`,
     db()`SELECT t.id,c.name,t.barcode,t.original_name FROM ticket_inventory t JOIN ticket_classes c ON c.id=t.class_id WHERE t.status='NEEDS_REVIEW' AND t.is_demo=${demo} ORDER BY t.id LIMIT 50`,
     db()`SELECT id,donor_name,amount,payment_reference FROM donations WHERE status='PENDING' AND expires_at>now() AND is_demo=${demo} ORDER BY created_at LIMIT 50`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
-    db()`SELECT n.kind,n.status,count(*) AS count FROM notification_outbox n JOIN orders o ON o.id=n.order_id WHERE o.is_demo=${demo} GROUP BY n.kind,n.status`,
+    db()`SELECT n.id,n.kind,n.status,n.demo_message,n.created_at,u.name FROM notification_outbox n JOIN orders o ON o.id=n.order_id JOIN users u ON u.id=n.user_id WHERE o.is_demo=${demo} ORDER BY n.created_at DESC LIMIT 50`,
     db()`SELECT value FROM site_settings WHERE key='stream'`,
     db()`SELECT count(*) FILTER (WHERE status='CONFIRMED')::integer AS confirmed,count(*) FILTER(WHERE status='PAYMENT_REVIEW')::integer AS reviewing FROM orders WHERE is_demo=${demo}`,
     db()`SELECT count(*)::integer AS total FROM ticket_checkins c JOIN ticket_inventory t ON t.id=c.ticket_id WHERE t.is_demo=${demo}`,
     db()`SELECT b.id,b.created_at,count(t.id)::integer AS total,count(t.id) FILTER(WHERE t.status='NEEDS_REVIEW')::integer AS review FROM ticket_import_batches b LEFT JOIN ticket_inventory t ON t.batch_id=b.id AND t.is_demo=${demo} GROUP BY b.id ORDER BY b.created_at DESC LIMIT 20`,
     db()`SELECT id,name,email,role,created_at FROM users WHERE is_demo=${demo} ORDER BY created_at DESC LIMIT 50`,
+    db()`SELECT id,donor_name,anonymous,amount,status,created_at FROM donations WHERE is_demo=${demo} ORDER BY created_at DESC LIMIT 50`,
   ]);
   const payment = settingValue<{
     bank: string;
@@ -82,7 +92,8 @@ export default async function AdminPage({
     streamSettings[0]?.value,
   );
   return (
-    <main className="dashboard wrap section">
+    <main className="dashboard wrap section admin-dashboard">
+      {demo && params.demoReset === "1" && <div className="demo-result" role="status">{en ? "Demo data restored." : "Data demo berhasil dipulihkan."}</div>}
       <div className="dashboard-head">
         <div>
           <p className="eyebrow">{t.operationsLabel} / SYMPHONY OF FAITH</p>
@@ -91,7 +102,7 @@ export default async function AdminPage({
         </div>
         <a href="/account">{t.myAccount} ↗</a>
       </div>
-      <nav className="admin-nav" aria-label={t.adminSections}>
+      <nav className="admin-nav admin-sidebar" aria-label={t.adminSections}>
         <a href="#overview">{t.overview}</a>
         <a href="#inventory">{t.inventory}</a>
         <a href="#checkin">Check-in</a>
@@ -180,7 +191,7 @@ export default async function AdminPage({
             </tbody>
           </table>
         </div>
-        {user.role === "ADMIN" && (
+        {user.role === "ADMIN" && !demo && (
           <>
             <BatchImport
               classes={stock
@@ -284,8 +295,9 @@ export default async function AdminPage({
             )}
           </>
         )}
+        {demo && <p className="empty">{en ? "Demo PDFs are generated individually after simulated payment. No source PDF upload is required." : "PDF demo dibuat per tiket setelah pembayaran simulasi. Unggah PDF sumber tidak diperlukan."}</p>}
       </section>
-      {user.role === "ADMIN" && (
+      {(user.role === "ADMIN" || user.role === "CHECK_IN") && (
         <section id="checkin" className="dashboard-section">
           <p className="eyebrow">ENTRY / VENUE</p>
           <h2>{t.checkInTickets}</h2>
@@ -323,6 +335,7 @@ export default async function AdminPage({
                 "CONFIRMED",
                 "CANCELLED",
                 "EXPIRED",
+                "FAILED",
               ].map((value) => (
                 <option key={value} value={value}>
                   {secondaryStatus(locale, value)}
@@ -396,6 +409,11 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+        <div className="pagination" aria-label={en ? "Order pages" : "Halaman pesanan"}>
+          {page > 1 && <a href={`/admin?q=${encodeURIComponent(q)}&status=${status}&page=${page - 1}#payments`}>{en ? "Previous" : "Sebelumnya"}</a>}
+          <span>{en ? "Page" : "Halaman"} {page}</span>
+          {orders.length === 25 && <a href={`/admin?q=${encodeURIComponent(q)}&status=${status}&page=${page + 1}#payments`}>{en ? "Next" : "Berikutnya"}</a>}
+        </div>
       </section>
       <section id="donations" className="dashboard-section">
         <p className="eyebrow">04 / DONATIONS</p>
@@ -451,6 +469,14 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+        <div className="record-list donation-history">
+          {donationHistory.map((row) => (
+            <div className="record" key={row.id}>
+              <div><strong>{row.anonymous ? (en ? "Anonymous donor" : "Donatur anonim") : row.donor_name}</strong><p>{money(row.amount)} · {secondaryStatus(locale, String(row.status))}</p></div>
+              {demo && <span className="demo-receipt">SIMULATED</span>}
+            </div>
+          ))}
+        </div>
       </section>
       <section id="notifications" className="dashboard-section">
         <p className="eyebrow">05 / NOTIFICATIONS</p>
@@ -458,17 +484,22 @@ export default async function AdminPage({
         {notifications.length === 0 ? (
           <p className="empty">{t.noNotificationsYet}</p>
         ) : (
-          <ul>
+          <div className="record-list notification-history">
             {notifications.map((row) => (
-              <li key={`${row.kind}-${row.status}`}>
-                {row.kind} · {row.status} · {row.count}
-              </li>
+              <article className="record whatsapp-preview" key={row.id}>
+                <div>
+                  <strong>{row.name} · {row.kind}</strong>
+                  <p className="status">{row.status}</p>
+                  {messagePreview(row.demo_message) && <><p>{messagePreview(row.demo_message)?.title}</p><p>{messagePreview(row.demo_message)?.body}</p>{messagePreview(row.demo_message)?.tickets?.map((ticket) => <a key={ticket.url} href={ticket.url}>{ticket.name} · PDF</a>)}</>}
+                </div>
+                {demo && <span className="demo-receipt">WHATSAPP PREVIEW · SIMULATED</span>}
+              </article>
             ))}
-          </ul>
+          </div>
         )}
         <p className="hint">{t.sendingStartsOnceOfficialWhatsAppCredentials}</p>
       </section>
-      {user.role === "ADMIN" && (
+      {(user.role === "ADMIN" || user.role === "STREAM_OPERATOR") && (
         <section id="stream" className="dashboard-section">
           <p className="eyebrow">06 / LIVESTREAM</p>
           <h2>{t.streamControls}</h2>
@@ -505,7 +536,7 @@ export default async function AdminPage({
         <section id="settings" className="dashboard-section">
           <p className="eyebrow">06 / SETTINGS</p>
           <h2>{t.paymentAccount}</h2>
-          <form className="panel admin-form" action={configurePayment}>
+          {!demo && <form className="panel admin-form" action={configurePayment}>
             <label>
               Bank
               <input name="bank" defaultValue={payment?.bank ?? ""} required />
@@ -527,7 +558,14 @@ export default async function AdminPage({
               />
             </label>
             <button type="submit">{t.saveTransferInstructions}</button>
-          </form>
+          </form>}
+          {demo && (
+            <div className="demo-reset-panel">
+              <h3>{en ? "Client demo data" : "Data demo klien"}</h3>
+              <p>{en ? "Restore seeded examples and the official 1,850-ticket inventory." : "Pulihkan contoh awal dan inventaris resmi 1.850 tiket."}</p>
+              <DemoReset locale={locale} />
+            </div>
+          )}
         </section>
       )}
       {user.role === "ADMIN" && (
@@ -551,6 +589,8 @@ export default async function AdminPage({
                     <select name="role" defaultValue={account.role}>
                       <option value="CUSTOMER">Customer</option>
                       <option value="FINANCE">Finance</option>
+                      <option value="CHECK_IN">Check-in</option>
+                      <option value="STREAM_OPERATOR">Livestream Operator</option>
                       <option value="ADMIN">Admin</option>
                     </select>
                   </label>

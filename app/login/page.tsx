@@ -47,6 +47,12 @@ export default async function LoginPage({
                 <form action={demoLogin} key={role}>
                   <input type="hidden" name="role" value={role} />
                   <input type="hidden" name="next" value={next} />
+                  {role !== "customer" && (
+                    <label>
+                      {en ? "Client access code" : "Kode akses klien"}
+                      <input name="accessCode" type="password" required autoComplete="off" />
+                    </label>
+                  )}
                   <button type="submit" className={role === "customer" ? "" : "secondary-button"}>
                     {en ? "Sign in as" : "Masuk sebagai"} Demo {role === "customer" ? "Customer" : role === "admin" ? "Administrator" : "Finance"}
                   </button>

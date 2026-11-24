@@ -4,9 +4,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { demoModeEnabled } from "@/lib/demo-config";
 
 export async function POST(request: Request) {
   try {
+    if (demoModeEnabled()) return NextResponse.json({ error: "PDF resmi dinonaktifkan dalam demo." }, { status: 409 });
     const admin = await requireAdmin();
     const data = await request.formData();
     const classId = z.uuid().parse(data.get("classId"));

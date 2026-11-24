@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
+import { browserLaunchOptions } from "./browser-launch.mjs";
 import postgres from "postgres";
 
 if (!process.env.DATABASE_URL?.includes("/sof_test?"))
@@ -14,11 +15,7 @@ const tag = randomUUID();
 const [testTicket] =
   await sql`INSERT INTO ticket_inventory(class_id,file_key,file_hash,barcode,status,verified_at) VALUES (${ticketClass.id},${`test/${tag}.pdf`},${tag.replaceAll("-", "").padEnd(64, "0")},${`TEST-${tag}`},'AVAILABLE',now()) RETURNING id`;
 await sql`UPDATE ticket_classes SET sale_enabled=true WHERE id=${ticketClass.id}`;
-const browser = await chromium.launch({
-  executablePath:
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  headless: true,
-});
+const browser = await chromium.launch(browserLaunchOptions());
 await fs.mkdir("artifacts/screenshots", { recursive: true });
 const errors = [];
 try {

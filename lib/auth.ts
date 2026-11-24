@@ -35,6 +35,20 @@ export async function requireFinance() {
   return user;
 }
 
+export async function requireCheckIn() {
+  const user = await requireUser();
+  if (user.role !== "ADMIN" && user.role !== "CHECK_IN")
+    throw new Error("Akses ditolak.");
+  return user;
+}
+
+export async function requireStreamOperator() {
+  const user = await requireUser();
+  if (user.role !== "ADMIN" && user.role !== "STREAM_OPERATOR")
+    throw new Error("Akses ditolak.");
+  return user;
+}
+
 export async function createSession(userId: string) {
   const token = randomBytes(32).toString("base64url");
   await db()`INSERT INTO sessions(token_hash,user_id,expires_at) VALUES (${digest(token)},${userId},now()+interval '7 days')`;

@@ -52,11 +52,11 @@ export async function POST(request: Request) {
       for (const status of change.value?.statuses ?? []) {
         if (!status.id) continue;
         if (status.status === "delivered")
-          await db()`UPDATE notification_outbox SET status='DELIVERED',delivered_at=coalesce(delivered_at,now()) WHERE provider_id=${status.id} AND status='SENT'`;
+          await db()`UPDATE notification_outbox n SET status='DELIVERED',delivered_at=coalesce(delivered_at,now()) WHERE provider_id=${status.id} AND status='SENT' AND EXISTS(SELECT 1 FROM orders o WHERE o.id=n.order_id AND o.is_demo=false)`;
         if (status.status === "read")
-          await db()`UPDATE notification_outbox SET status='READ',delivered_at=coalesce(delivered_at,now()),read_at=coalesce(read_at,now()) WHERE provider_id=${status.id} AND status IN ('SENT','DELIVERED')`;
+          await db()`UPDATE notification_outbox n SET status='READ',delivered_at=coalesce(delivered_at,now()),read_at=coalesce(read_at,now()) WHERE provider_id=${status.id} AND status IN ('SENT','DELIVERED') AND EXISTS(SELECT 1 FROM orders o WHERE o.id=n.order_id AND o.is_demo=false)`;
         if (status.status === "failed")
-          await db()`UPDATE notification_outbox SET status='FAILED',last_error='Provider reported delivery failure' WHERE provider_id=${status.id} AND status='SENT'`;
+          await db()`UPDATE notification_outbox n SET status='FAILED',last_error='Provider reported delivery failure' WHERE provider_id=${status.id} AND status='SENT' AND EXISTS(SELECT 1 FROM orders o WHERE o.id=n.order_id AND o.is_demo=false)`;
       }
   return NextResponse.json({ ok: true });
 }

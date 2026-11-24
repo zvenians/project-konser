@@ -1,16 +1,13 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
+import { browserLaunchOptions } from "./browser-launch.mjs";
 import postgres from "postgres";
 
 if (!process.env.DATABASE_URL?.includes("/sof_test?"))
   throw new Error("Test concurrency hanya boleh memakai sof_test");
 const sql = postgres(process.env.DATABASE_URL, { max: 4, prepare: false });
-const browser = await chromium.launch({
-  executablePath:
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  headless: true,
-});
+const browser = await chromium.launch(browserLaunchOptions());
 const base = process.env.APP_URL ?? "http://localhost:3220";
 const tag = randomUUID().slice(0, 8);
 try {

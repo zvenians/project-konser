@@ -3,6 +3,39 @@
   min-width: 0;
   overflow-x: clip;
 }
+.admin-dashboard {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  column-gap: 44px;
+  align-items: start;
+}
+.admin-dashboard > * {
+  grid-column: 2;
+}
+.admin-dashboard > .admin-sidebar {
+  grid-column: 1;
+  grid-row: 1 / span 40;
+  position: sticky;
+  top: 82px;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  max-height: calc(100vh - 100px);
+  padding: 12px 0;
+  overflow-y: auto;
+  border: 0;
+}
+.admin-sidebar a {
+  padding: 11px 12px;
+  border-left: 2px solid transparent;
+  color: var(--muted);
+}
+.admin-sidebar a:hover,
+.admin-sidebar a:focus-visible {
+  border-left-color: var(--gold);
+  color: var(--ink);
+  background: rgba(255,255,255,.04);
+}
 .dashboard-head {
   display: flex;
   justify-content: space-between;
@@ -198,6 +231,43 @@
   font-size: 0.8rem;
   font-weight: 800;
 }
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 18px;
+  font-size: .8rem;
+}
+.pagination a {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+}
+.whatsapp-preview {
+  border-color: #315e47;
+  background: #17251e;
+}
+.demo-reset-panel {
+  max-width: 620px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #6e453e;
+  background: #2a211f;
+}
+.danger-button {
+  background: #a94335;
+  color: #fff;
+}
+.demo-reset-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.demo-reset-dialog::backdrop {
+  background: rgba(0,0,0,.72);
+}
 .order-filter {
   display: flex;
   flex-wrap: wrap;
@@ -234,6 +304,21 @@
   background: #111;
 }
 @media (max-width: 700px) {
+  .admin-dashboard {
+    display: block;
+  }
+  .admin-dashboard > .admin-sidebar {
+    position: static;
+    display: flex;
+    max-height: none;
+    padding: 12px 0;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+  }
+  .admin-sidebar a {
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+  }
   .dashboard-head {
     align-items: start;
     flex-direction: column;

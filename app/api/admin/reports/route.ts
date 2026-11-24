@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireFinance } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { demoModeEnabled } from "@/lib/demo-config";
 
 const field = (value: unknown) => {
   const raw = String(value ?? "");
@@ -10,6 +11,7 @@ const field = (value: unknown) => {
 export async function GET(request: Request) {
   try {
     await requireFinance();
+    const demo = demoModeEnabled();
     const kind = new URL(request.url).searchParams.get("kind");
     let headers: string[];
     let rows: Record<string, unknown>[];
@@ -25,7 +27,7 @@ export async function GET(request: Request) {
         "bank_reference",
       ];
       rows =
-        await db()`SELECT o.id,o.created_at,u.name AS buyer,u.email,o.status,o.total,p.transfer_reference AS payment_reference,p.bank_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id ORDER BY o.created_at DESC`;
+        await db()`SELECT o.id,o.created_at,u.name AS buyer,u.email,o.status,o.total,p.transfer_reference AS payment_reference,p.bank_reference FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN payment_claims p ON p.order_id=o.id WHERE o.is_demo=${demo} ORDER BY o.created_at DESC`;
     } else if (kind === "donations") {
       headers = [
         "id",
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
         "bank_reference",
       ];
       rows =
-        await db()`SELECT id,created_at,donor_name,anonymous,status,amount,payment_reference,bank_reference FROM donations ORDER BY created_at DESC`;
+        await db()`SELECT id,created_at,donor_name,anonymous,status,amount,payment_reference,bank_reference FROM donations WHERE is_demo=${demo} ORDER BY created_at DESC`;
     } else
       return NextResponse.json(
         { error: "Jenis laporan tidak dikenal." },

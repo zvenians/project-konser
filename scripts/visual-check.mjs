@@ -1,15 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import { browserLaunchOptions } from "./browser-launch.mjs";
 
 const base = process.env.APP_URL ?? "http://localhost:3219";
 const out = path.join(process.cwd(), "artifacts", "screenshots");
 await fs.mkdir(out, { recursive: true });
-const browser = await chromium.launch({
-  executablePath:
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  headless: true,
-});
+const browser = await chromium.launch(browserLaunchOptions());
 const errors = [];
 try {
   for (const width of [360, 390, 768, 1024, 1440]) {

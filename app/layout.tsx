@@ -33,7 +33,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
   const locale = await getLocale();
   const demo = demoModeEnabled();
   return (
-    <html lang={locale}>
+    <html lang={locale} data-scroll-behavior="smooth">
       <body>
         {demo && (
           <div className="demo-preview-bar" data-demo-preview>

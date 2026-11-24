@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { secondaryMessages, secondaryStatus } from "@/lib/secondary-messages";
+import { demoModeEnabled } from "@/lib/demo-config";
 
 export const dynamic = "force-dynamic";
 export default async function DonationStatus({
@@ -14,7 +15,7 @@ export default async function DonationStatus({
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
   const [donation] =
-    await db()`SELECT id,amount,status,created_at FROM donations WHERE id=${id.data}`;
+    await db()`SELECT id,amount,status,created_at,is_demo,anonymous FROM donations WHERE id=${id.data} AND is_demo=${demoModeEnabled()}`;
   if (!donation) notFound();
   const locale = await getLocale();
   const t = secondaryMessages(locale).donationStatus;
@@ -23,6 +24,7 @@ export default async function DonationStatus({
       <p className="eyebrow">SYMPHONY OF FAITH / {t.donationsLabel}</p>
       <h1>{t.yourDonationStatus}</h1>
       <div className="panel" style={{ maxWidth: 640 }}>
+        {donation.is_demo && <p className="demo-receipt">SIMULATED DEMONSTRATION DATA</p>}
         <p>
           {t.reference}: {donation.id}
         </p>

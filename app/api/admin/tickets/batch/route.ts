@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { demoModeEnabled } from "@/lib/demo-config";
 
 const rowSchema = z.object({
   filename: z.string().min(1).max(180),
@@ -16,6 +17,7 @@ class ImportError extends Error {}
 export async function POST(request: Request) {
   let uploaded: string[] = [];
   try {
+    if (demoModeEnabled()) return NextResponse.json({ error: "Impor PDF resmi dinonaktifkan dalam demo." }, { status: 409 });
     const admin = await currentUser();
     if (admin?.role !== "ADMIN")
       return NextResponse.json({ error: "Akses ditolak." }, { status: 403 });

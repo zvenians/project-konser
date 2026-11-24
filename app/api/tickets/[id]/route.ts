@@ -48,16 +48,17 @@ export async function GET(
 ) {
   try {
     const user = await requireUser();
+    const demo = demoModeEnabled();
     const id = z.uuid().parse((await params).id);
     const [ticket] =
-      await db()`SELECT t.id,t.file_key,t.original_name,t.barcode,t.is_demo,c.name,o.id AS order_id FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE t.id=${id} AND o.user_id=${user.id} AND o.status='CONFIRMED' AND t.status='SOLD'`;
+      await db()`SELECT t.id,t.file_key,t.original_name,t.barcode,t.is_demo,c.name,o.id AS order_id FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE t.id=${id} AND o.user_id=${user.id} AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo} AND o.is_demo=${demo}`;
     if (!ticket)
       return NextResponse.json(
         { error: "Tiket tidak ditemukan." },
         { status: 404 },
       );
     if (ticket.is_demo) {
-      if (!demoModeEnabled()) return NextResponse.json({ error: "Demo tidak aktif." }, { status: 404 });
+      if (!demo) return NextResponse.json({ error: "Demo tidak aktif." }, { status: 404 });
       const bytes = await createDemoTicket({
         id: String(ticket.id),
         name: String(ticket.name),

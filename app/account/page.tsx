@@ -24,11 +24,12 @@ export default async function AccountPage({
   const t = secondaryMessages(locale).account;
   const user = await currentUser();
   if (!user) redirect("/login");
-  const [orders, tickets, settings, stream] = await Promise.all([
+  const [orders, tickets, settings, stream, notifications] = await Promise.all([
     db()`SELECT o.id,o.status,o.total,o.expires_at,o.created_at,o.demo_historical,p.outcome,p.receipt_label FROM orders o LEFT JOIN demo_payments p ON p.order_id=o.id WHERE o.user_id=${user.id} AND o.is_demo=${demo} ORDER BY o.created_at DESC LIMIT 50`,
     db()`SELECT t.id,c.name,t.barcode FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE o.user_id=${user.id} AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo}`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
     db()`SELECT count(*)::integer AS total FROM stream_entitlements WHERE user_id=${user.id} AND active=true`,
+    db()`SELECT n.id,n.status,n.demo_message FROM notification_outbox n JOIN orders o ON o.id=n.order_id WHERE n.user_id=${user.id} AND o.is_demo=${demo} ORDER BY n.created_at DESC LIMIT 20`,
   ]);
   const payment = settingValue<{
     bank: string;
@@ -184,6 +185,18 @@ export default async function AccountPage({
           </div>
         )}
       </section>
+      {demo && notifications.length > 0 && (
+        <section className="dashboard-section" id="notifications">
+          <p className="eyebrow">WHATSAPP / PREVIEW</p>
+          <h2>{en ? "Simulated message history" : "Riwayat pesan simulasi"}</h2>
+          <div className="record-list">
+            {notifications.map((notification) => {
+              const message = notification.demo_message as { title?: string; body?: string; tickets?: Array<{ name: string; url: string }> } | null;
+              return <article className="record whatsapp-preview" key={notification.id}><div><strong>{message?.title}</strong><p>{message?.body}</p>{message?.tickets?.map((ticket) => <a href={ticket.url} key={ticket.url}>{en ? "Download" : "Unduh"} {ticket.name} PDF</a>)}</div><span className="demo-receipt">{notification.status}</span></article>;
+            })}
+          </div>
+        </section>
+      )}
       <section id="tickets" className="dashboard-section">
         <p className="eyebrow">02 / COLLECTION</p>
         <h2>{t.myTickets}</h2>
