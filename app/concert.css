@@ -154,9 +154,9 @@
 .event-backdrop {
   position: absolute;
   inset: 0 0 auto;
-  height: 600px;
+  height: 780px;
   pointer-events: none;
-  background: linear-gradient(180deg, #31533d 0%, #284032 30%, #1b1b1d 100%);
+  background: linear-gradient(180deg, #10211d 0%, #18211e 54%, #1b1b1d 100%);
 }
 .event-container {
   position: relative;
@@ -176,37 +176,42 @@
   color: #b5b9b4;
 }
 .event-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 55px;
+  position: relative;
+  display: flex;
+  min-height: 650px;
   align-items: center;
-  padding-bottom: 54px;
+  overflow: hidden;
+  margin-bottom: 54px;
+  border-radius: 6px;
+  background: #0d1715;
+  box-shadow: 0 24px 80px #07100f80;
 }
 .event-cover {
-  grid-column: 2;
-  grid-row: 1;
-  position: relative;
-  aspect-ratio: 1.56;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  border-radius: 5px;
-  background: #172b26;
-  box-shadow: 0 20px 70px #0c181a66;
+  background: #0d1715;
 }
-.event-cover::before {
+.event-cover::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, #142d28, #23483a);
+  z-index: 1;
+  background:
+    linear-gradient(90deg, #09100fed 0%, #0a1110d4 30%, #0b111080 52%, transparent 78%),
+    linear-gradient(0deg, #0b100f8a 0%, transparent 42%);
 }
 .event-cover img {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  padding: 8%;
 }
 .event-identity {
-  grid-column: 1;
-  grid-row: 1;
+  position: relative;
+  z-index: 2;
+  width: min(520px, 48%);
   min-width: 0;
+  padding: 64px 0 64px 54px;
+  text-shadow: 0 2px 18px #0009;
 }
 .event-type {
   color: #c4c6c0;
@@ -862,7 +867,7 @@
     display: none;
   }
   .event-hero {
-    gap: 28px;
+    min-height: 610px;
   }
   .picker-layout,
   .event-lower {
@@ -939,18 +944,27 @@
     display: none;
   }
   .event-backdrop {
-    height: 390px;
+    height: 790px;
   }
   .event-hero {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 20px;
-    padding: 16px 0 37px;
+    min-height: 760px;
+    align-items: flex-end;
+    margin: 16px 0 38px;
   }
   .event-cover {
+    width: auto;
+  }
+  .event-cover::after {
+    background:
+      linear-gradient(0deg, #080d0ceb 0%, #09100fbc 34%, transparent 66%),
+      linear-gradient(90deg, #0a0e0d61, transparent 60%);
+  }
+  .event-cover img {
+    object-position: center top;
+  }
+  .event-identity {
     width: 100%;
-    aspect-ratio: 1.53;
+    padding: 230px 22px 24px;
   }
   .event-identity h1 {
     font-size: clamp(2.2rem, 9vw, 3.3rem);

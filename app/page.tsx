@@ -143,13 +143,19 @@ export default async function EventPage() {
           </div>
           <section className="event-hero" aria-labelledby="event-title">
             <div className="event-cover">
-              <Image
-                src="/brand/sof-gold-logo.png"
-                alt="Symphony of Faith"
-                fill
-                priority
-                sizes="(max-width: 800px) 100vw, 50vw"
-              />
+              <picture>
+                <source
+                  media="(max-width: 700px)"
+                  srcSet="/brand/church-hero-mobile.webp"
+                />
+                <Image
+                  src="/brand/church-hero-desktop.webp"
+                  alt="Perspektif eksterior Gereja Advent Karo"
+                  fill
+                  priority
+                  sizes="(max-width: 700px) calc(100vw - 32px), min(1232px, calc(100vw - 48px))"
+                />
+              </picture>
             </div>
             <div className="event-identity">
               <span className="event-type">CHARITY CONCERT · MEDAN</span>
