@@ -33,7 +33,7 @@ export function StreamViewingRoom({ locale }: { locale: "id" | "en" }) {
   return <main className="stream-room">
     <header className="stream-room-head">
       <div><p className="eyebrow">SYMPHONY OF FAITH / LIVESTREAM</p><h1>{en ? "Live viewing room" : "Ruang tayang langsung"}</h1><p>{en ? "Sunday, 7 February 2027 · 19:00 WIB" : "Minggu, 7 Februari 2027 · 19.00 WIB"}</p></div>
-      <Link href="/account">← {en ? "Back to account" : "Kembali ke akun"}</Link>
+      <Link href="/claim-ticket">← {en ? "Back to ticket claim" : "Kembali ke Claim Ticket"}</Link>
     </header>
     <section className="stream-stage" aria-live="polite">
       <div className="stream-status-line"><span className={`broadcast-dot state-${state.toLowerCase()}`} />{state.replace("_", " ")}<span>{en ? "Access verified" : "Akses terverifikasi"}</span></div>
