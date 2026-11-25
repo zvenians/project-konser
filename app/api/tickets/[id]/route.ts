@@ -7,7 +7,9 @@ import { demoModeEnabled } from "@/lib/demo-config";
 import { demoTicketTitle } from "@/lib/demo-ticket";
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import QRCode from "qrcode";
-import { currentClaim } from "@/lib/guest";
+import { currentClaim, tokenDigest } from "@/lib/guest";
+import { guestOwnsTicket } from "@/lib/order-access";
+import { verifyTicketDownloadToken } from "@/lib/download-tokens";
 
 async function createDemoTicket(ticket: {
   id: string;
@@ -44,22 +46,26 @@ async function createDemoTicket(ticket: {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await currentUser();
     const claim = await currentClaim("TICKET");
-    if (!user && !claim) throw new Error("Akses ditolak.");
     const demo = demoModeEnabled();
     const id = z.uuid().parse((await params).id);
     const [ticket] =
-      await db()`SELECT t.id,t.file_key,t.original_name,t.barcode,t.is_demo,c.name,o.id AS order_id FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE t.id=${id} AND ((${user?.id ?? null}::uuid IS NOT NULL AND o.user_id=${user?.id ?? null}) OR (${claim?.destination_hash ?? null}::text IS NOT NULL AND encode(digest(o.buyer_phone,'sha256'),'hex')=${claim?.destination_hash ?? null})) AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo} AND o.is_demo=${demo}`;
+      await db()`SELECT t.id,t.file_key,t.original_name,t.barcode,t.is_demo,c.name,o.id AS order_id,o.user_id,o.buyer_phone FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE t.id=${id} AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo} AND o.is_demo=${demo}`;
     if (!ticket)
       return NextResponse.json(
         { error: "Tiket tidak ditemukan." },
         { status: 404 },
       );
+    const signed = await verifyTicketDownloadToken(new URL(request.url).searchParams.get("token") || "", ticket.order_id, id);
+    const guest = await guestOwnsTicket(ticket.order_id, id);
+    const claimed = claim && tokenDigest(String(ticket.buyer_phone)) === claim.destination_hash;
+    const owned = user && ticket.user_id === user.id;
+    if (!signed && !guest && !claimed && !owned) throw new Error("Akses ditolak.");
     if (ticket.is_demo) {
       if (!demo) return NextResponse.json({ error: "Demo tidak aktif." }, { status: 404 });
       const bytes = await createDemoTicket({
@@ -85,7 +91,7 @@ export async function GET(
     return new Response(blob.stream, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${id}.pdf"`,
+        "Content-Disposition": `attachment; filename="${String(ticket.original_name || `${id}.pdf`).replace(/[^A-Za-z0-9._-]/g, "-")}"`,
         "Cache-Control": "private, no-store",
       },
     });

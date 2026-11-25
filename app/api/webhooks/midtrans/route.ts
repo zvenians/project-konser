@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { realTransactionsEnabled } from "@/lib/providers";
+import { processDeliveryJobs } from "@/lib/delivery-worker";
 
 const payloadSchema = z.object({
   order_id: z.uuid(), transaction_id: z.string().min(1), transaction_status: z.string(),
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     const response = await fetch(`${base}/v2/${encodeURIComponent(body.order_id)}/status`, { headers: { Authorization: `Basic ${Buffer.from(`${serverKey}:`).toString("base64")}` }, cache: "no-store", signal: AbortSignal.timeout(10_000) });
     if (!response.ok) return NextResponse.json({ error: "verification failed" }, { status: 502 });
     const verified = payloadSchema.passthrough().parse(await response.json());
-    if (!safeEqual(verified.signature_key, body.signature_key) || verified.transaction_status !== body.transaction_status)
+    if (verified.order_id !== body.order_id || verified.transaction_id !== body.transaction_id)
       return NextResponse.json({ error: "verification mismatch" }, { status: 409 });
     const amount = Math.round(Number(verified.gross_amount));
     const payloadHash = createHash("sha256").update(JSON.stringify(verified)).digest("hex");
@@ -38,13 +39,24 @@ export async function POST(request: Request) {
         await tx`UPDATE stream_entitlements SET active=true,revoked_at=NULL WHERE order_id=${order.id}`;
         if (order.buyer_phone) await tx`INSERT INTO delivery_jobs(order_id,channel,kind,recipient) VALUES (${order.id},'WHATSAPP','ORDER_FULFILLMENT',${order.buyer_phone}) ON CONFLICT DO NOTHING`;
         if (order.buyer_email) await tx`INSERT INTO delivery_jobs(order_id,channel,kind,recipient) VALUES (${order.id},'EMAIL','ORDER_FULFILLMENT',${order.buyer_email}) ON CONFLICT DO NOTHING`;
+      } else if (paid && ["EXPIRED","CANCELLED","FAILED"].includes(order.status)) {
+        await tx`UPDATE orders SET status='PAYMENT_REVIEW',payment_reference=${verified.transaction_id} WHERE id=${order.id}`;
+        await tx`INSERT INTO audit_logs(action,resource_id,details) VALUES ('MIDTRANS_LATE_PAYMENT',${order.id},${JSON.stringify({ transactionId: verified.transaction_id, previousStatus: order.status })}::jsonb)`;
+      } else if (["refund","partial_refund"].includes(verified.transaction_status) && order.status === "CONFIRMED") {
+        await tx`UPDATE orders SET status='REFUNDED' WHERE id=${order.id}`;
+        await tx`UPDATE stream_entitlements SET active=false,revoked_at=now() WHERE order_id=${order.id}`;
+        await tx`UPDATE stream_viewer_sessions SET active=false,ended_at=now() WHERE entitlement_id IN (SELECT id FROM stream_entitlements WHERE order_id=${order.id})`;
+        await tx`UPDATE ticket_inventory SET status='VOIDED' WHERE id IN (SELECT a.ticket_id FROM ticket_allocations a JOIN order_items i ON i.id=a.item_id WHERE i.order_id=${order.id})`;
+        await tx`INSERT INTO audit_logs(action,resource_id,details) VALUES ('MIDTRANS_REFUND',${order.id},${JSON.stringify({ transactionId: verified.transaction_id, status: verified.transaction_status })}::jsonb)`;
       } else if (terminal && order.status !== "CONFIRMED") {
         const status = verified.transaction_status === "expire" ? "EXPIRED" : verified.transaction_status.includes("refund") ? "REFUNDED" : "FAILED";
         await tx`UPDATE orders SET status=${status} WHERE id=${order.id}`;
         await tx`UPDATE ticket_inventory SET status='AVAILABLE' WHERE id IN (SELECT a.ticket_id FROM ticket_allocations a JOIN order_items i ON i.id=a.item_id WHERE i.order_id=${order.id})`;
         await tx`DELETE FROM ticket_allocations WHERE item_id IN (SELECT id FROM order_items WHERE order_id=${order.id})`;
+        await tx`UPDATE stream_entitlements SET active=false,revoked_at=now() WHERE order_id=${order.id}`;
       }
     });
+    await processDeliveryJobs(10);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(JSON.stringify({ event: "midtrans_webhook_failed", message: error instanceof Error ? error.message : "unknown" }));

@@ -1,12 +1,13 @@
 import { requestClaim, verifyClaim } from "@/app/actions";
 import { currentClaim } from "@/lib/guest";
 import { db } from "@/lib/db";
+import { demoModeEnabled } from "@/lib/demo-config";
 
 export default async function ClaimTicketPage({ searchParams }: { searchParams: Promise<Record<string,string|undefined>> }) {
   const query = await searchParams;
   const otp = query.otp === "1";
   const claim = await currentClaim("TICKET");
-  const tickets = claim ? await db()`SELECT t.id,c.name,t.barcode FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE encode(digest(o.buyer_phone,'sha256'),'hex')=${claim.destination_hash} AND o.status='CONFIRMED' AND t.status='SOLD' ORDER BY c.name,t.id` : [];
+  const tickets = claim ? await db()`SELECT t.id,c.name,t.barcode FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE encode(digest(o.buyer_phone,'sha256'),'hex')=${claim.destination_hash} AND o.status='CONFIRMED' AND o.is_demo=${demoModeEnabled()} AND t.status='SOLD' AND t.is_demo=${demoModeEnabled()} ORDER BY c.name,t.id` : [];
   return <main className="claim-page event-container">
     <p className="eyebrow">SECURE CLAIM</p>
     <h1>Claim Ticket</h1>
@@ -17,7 +18,6 @@ export default async function ClaimTicketPage({ searchParams }: { searchParams: 
       <input type="hidden" name="channel" value={query.channel}/><input type="hidden" name="scope" value={query.scope}/>
       <label>Nomor WhatsApp atau email<input name="destination" required /></label>
       <label>Kode 6 digit<input name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required /></label>
-      {query.demoCode && <p className="claim-notice">Kode simulasi: <strong>{query.demoCode}</strong></p>}
       <button>Verifikasi</button>
     </form> : <div className="claim-methods">
       <form action={requestClaim} className="claim-form"><input type="hidden" name="channel" value="WHATSAPP"/><input type="hidden" name="scope" value="TICKET"/><label>Nomor WhatsApp pembelian<input name="destination" type="tel" required /></label><button>Kirim OTP WhatsApp</button></form>

@@ -25,6 +25,9 @@ import { cartTotal, reservationIsActive } from "@/lib/transactions";
 import { demoCustomerEmail } from "@/lib/demo-identity";
 import { broadcastStates, normalizeStreamConfig } from "@/lib/streaming";
 import { guestOrderTokenHash, newGuestToken, normalizePhone, setGuestOrderToken, tokenDigest } from "@/lib/guest";
+import { productionProviders, realTransactionsEnabled } from "@/lib/providers";
+import { headers } from "next/headers";
+import { processDeliveryJobs } from "@/lib/delivery-worker";
 
 const credentials = z.object({
   email: z.email().max(254),
@@ -117,40 +120,56 @@ export async function requestClaim(form: FormData) {
     ? normalizePhone(values.destination)
     : z.email().parse(values.destination).toLowerCase();
   const destinationHash = tokenDigest(destination);
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const limitKey = tokenDigest(`${ip}:${destinationHash}:${values.channel}:${values.scope}`);
+  const [limit] = await db()`INSERT INTO claim_rate_limits(key_hash,attempts,window_started_at,updated_at)
+    VALUES (${limitKey},1,now(),now()) ON CONFLICT(key_hash) DO UPDATE SET
+      attempts=CASE WHEN claim_rate_limits.window_started_at<now()-interval '15 minutes' THEN 1 ELSE claim_rate_limits.attempts+1 END,
+      window_started_at=CASE WHEN claim_rate_limits.window_started_at<now()-interval '15 minutes' THEN now() ELSE claim_rate_limits.window_started_at END,
+      blocked_until=CASE WHEN claim_rate_limits.attempts>=9 AND claim_rate_limits.window_started_at>=now()-interval '15 minutes' THEN now()+interval '15 minutes' ELSE claim_rate_limits.blocked_until END,
+      updated_at=now() RETURNING attempts,blocked_until`;
+  if ((limit.blocked_until && new Date(limit.blocked_until)>new Date()) || Number(limit.attempts)>10)
+    redirect("/claim-ticket?sent=1");
   if (values.channel === "EMAIL" && values.scope === "TICKET") {
     const orders = await db()`SELECT id FROM orders WHERE lower(buyer_email)=${destination} AND status='CONFIRMED' AND is_demo=${demoModeEnabled()} AND EXISTS (SELECT 1 FROM order_items i JOIN ticket_classes c ON c.id=i.class_id WHERE i.order_id=orders.id AND c.mode='VENUE')`;
     for (const order of orders)
-      await db()`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status) VALUES (${order.id},'EMAIL','TICKET_RESEND',${destination},${demoModeEnabled() ? "SIMULATED" : "PENDING"}) ON CONFLICT DO UPDATE SET status=excluded.status,next_attempt_at=now(),updated_at=now()`;
+      await db()`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status) VALUES (${order.id},'EMAIL','TICKET_RESEND',${destination},${demoModeEnabled() ? "SIMULATED" : "PENDING"}) ON CONFLICT DO UPDATE SET status=excluded.status,attempts=0,last_error=NULL,next_attempt_at=now(),updated_at=now()`;
+    if (!demoModeEnabled() && realTransactionsEnabled()) await processDeliveryJobs(10);
     redirect("/claim-ticket?sent=1");
   }
-  const [recent] = await db()`SELECT created_at FROM claim_otps WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} ORDER BY created_at DESC LIMIT 1`;
-  if (recent && Date.now() - new Date(recent.created_at).getTime() < 60_000)
-    redirect("/claim-ticket?cooldown=1");
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  await db().begin(async (tx) => {
+  const queued = await db().begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${destinationHash}))`;
+    const [recent] = await tx`SELECT created_at FROM claim_otps WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} ORDER BY created_at DESC LIMIT 1`;
+    if (recent && Date.now() - new Date(recent.created_at).getTime() < 60_000) return false;
     await tx`UPDATE claim_otps SET used_at=now() WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} AND used_at IS NULL`;
     await tx`INSERT INTO claim_otps(destination_hash,channel,scope,code_hash,expires_at) VALUES (${destinationHash},${values.channel},${values.scope},${await hash(code, 12)},now()+interval '5 minutes')`;
     const orders = await tx`SELECT id FROM orders WHERE status='CONFIRMED' AND is_demo=${demoModeEnabled()} AND (${values.channel}='WHATSAPP' AND buyer_phone=${destination} OR ${values.channel}='EMAIL' AND lower(buyer_email)=${destination})`;
     for (const order of orders)
-      await tx`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status,payload) VALUES (${order.id},${values.channel},${`${values.scope}_OTP`},${destination},${demoModeEnabled() ? "SIMULATED" : "PENDING"},${JSON.stringify({ code, expiresInMinutes: 5 })}::jsonb) ON CONFLICT DO UPDATE SET status=excluded.status,payload=excluded.payload,next_attempt_at=now(),updated_at=now()`;
+      await tx`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status,payload) VALUES (${order.id},${values.channel},${`${values.scope}_OTP`},${destination},${demoModeEnabled() ? "SIMULATED" : "PENDING"},${JSON.stringify({ code, expiresInMinutes: 5 })}::jsonb) ON CONFLICT DO UPDATE SET status=excluded.status,payload=excluded.payload,attempts=0,last_error=NULL,next_attempt_at=now(),updated_at=now()`;
+    return true;
   });
-  redirect(`/claim-ticket?otp=1&channel=${values.channel}&scope=${values.scope}${demoModeEnabled() ? `&demoCode=${code}` : ""}`);
+  if (!queued) redirect(`${values.scope === "LIVESTREAM" ? "/livestream" : "/claim-ticket"}?cooldown=1`);
+  if (!demoModeEnabled() && realTransactionsEnabled()) await processDeliveryJobs(10);
+  redirect(`${values.scope === "LIVESTREAM" ? "/livestream" : "/claim-ticket"}?otp=1&channel=${values.channel}&scope=${values.scope}`);
 }
 
 export async function verifyClaim(form: FormData) {
   const values = claimRequest.extend({ code: z.string().regex(/^\d{6}$/) }).parse(Object.fromEntries(form));
   const destination = values.channel === "WHATSAPP" ? normalizePhone(values.destination) : z.email().parse(values.destination).toLowerCase();
   const destinationHash = tokenDigest(destination);
-  const [otp] = await db()`SELECT id,code_hash,attempts FROM claim_otps WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} AND used_at IS NULL AND expires_at>now() ORDER BY created_at DESC LIMIT 1`;
-  if (!otp || otp.attempts >= 5 || !(await compare(values.code, otp.code_hash))) {
-    if (otp) await db()`UPDATE claim_otps SET attempts=attempts+1 WHERE id=${otp.id}`;
-    throw new Error("Kode tidak valid atau sudah kedaluwarsa.");
-  }
   const token = newGuestToken();
-  await db().begin(async (tx) => {
+  const verified = await db().begin(async (tx) => {
+    const [otp] = await tx`SELECT id,code_hash,attempts FROM claim_otps WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} AND used_at IS NULL AND expires_at>now() ORDER BY created_at DESC LIMIT 1 FOR UPDATE`;
+    if (!otp || otp.attempts >= 5 || !(await compare(values.code, otp.code_hash))) {
+      if (otp) await tx`UPDATE claim_otps SET attempts=attempts+1 WHERE id=${otp.id}`;
+      return false;
+    }
     await tx`UPDATE claim_otps SET used_at=now() WHERE id=${otp.id}`;
     await tx`INSERT INTO claim_sessions(token_hash,destination_hash,scope,expires_at) VALUES (${tokenDigest(token)},${destinationHash},${values.scope},now()+interval '30 minutes')`;
+    return true;
   });
+  if (!verified) throw new Error("Kode tidak valid atau sudah kedaluwarsa.");
   (await cookies()).set("sof_claim", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 1800 });
   redirect(values.scope === "LIVESTREAM" ? "/livestream" : "/claim-ticket?verified=1");
 }
@@ -194,9 +213,7 @@ export async function reserve(form: FormData) {
     const [previous] =
       await tx`SELECT id,guest_token_hash FROM orders WHERE idempotency_key=${key}`;
     if (previous) {
-      createdOrderId = previous.id;
-      await tx`UPDATE orders SET guest_token_hash=${tokenDigest(guestToken)} WHERE id=${previous.id}`;
-      return;
+      throw new Error("Permintaan checkout ini sudah pernah digunakan. Muat ulang halaman sebelum mencoba lagi.");
     }
     const allocations: { itemId: string; ticketId: string }[] = [];
     const prepared: {
@@ -270,6 +287,11 @@ export async function reserve(form: FormData) {
       await tx`INSERT INTO ticket_allocations(ticket_id,item_id) VALUES (${allocation.ticketId},${allocation.itemId})`;
     }
   });
+  if (!demo && realTransactionsEnabled()) {
+    const [created] = await db()`SELECT total,buyer_name,buyer_email,buyer_phone FROM orders WHERE id=${createdOrderId} AND guest_token_hash=${tokenDigest(guestToken)}`;
+    const payment = await productionProviders.payment.createPayment({ orderId: createdOrderId, amount: Number(created.total), customer: { name: created.buyer_name, email: created.buyer_email || "", phone: created.buyer_phone } });
+    await db()`UPDATE orders SET payment_reference=${payment.reference},payment_url=${payment.redirectUrl ?? null},status='PAYMENT_REVIEW' WHERE id=${createdOrderId} AND status='PENDING'`;
+  }
   await setGuestOrderToken(guestToken);
   redirect(`/orders/${createdOrderId}`);
 }
