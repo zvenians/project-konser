@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { CheckoutCart } from "@/components/checkout-cart";
-import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { settingValue } from "@/lib/settings";
@@ -11,8 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function CheckoutPage() {
   const demo = demoModeEnabled();
   const locale = await getLocale();
-  const [user, classes, settings] = await Promise.all([
-    currentUser(),
+  const [classes, settings] = await Promise.all([
     db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.purchase_limit,c.sale_enabled,e.streaming_ready,
       count(t.id) FILTER (WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS venue_available,
       coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')),0) AS stream_reserved
@@ -55,7 +53,6 @@ export default async function CheckoutPage() {
         <CheckoutCart
           options={options}
           locale={locale}
-          authenticated={Boolean(user)}
           idempotencyKey={randomUUID()}
         />
       </main>

@@ -64,8 +64,8 @@ export function PublicNavigation({ locale = "id" }: { locale?: Locale }) {
         </nav>
         <div className="event-nav-actions">
           <LanguageSwitcher locale={locale} />
-          <Link className="nav-account" href="/account">
-            {locale === "id" ? "Akun" : "Account"}
+          <Link className="nav-account" href="/claim-ticket">
+            {locale === "id" ? "Claim Ticket" : "Claim Ticket"}
           </Link>
           <Link className="nav-buy" href="/#tickets">
             {locale === "id" ? "Beli tiket" : "Get tickets"}
@@ -111,8 +111,8 @@ export function PublicNavigation({ locale = "id" }: { locale?: Locale }) {
                 {link.label}
               </Link>
             ))}
-            <Link href="/account">
-              {locale === "id" ? "Akun saya" : "My account"}
+            <Link href="/claim-ticket">
+              Claim Ticket
             </Link>
             <LanguageSwitcher locale={locale} />
           </motion.nav>

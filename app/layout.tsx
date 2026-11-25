@@ -5,6 +5,7 @@ import "./concert.css";
 import { getLocale } from "@/lib/i18n";
 import { PublicNavigation } from "@/components/public-navigation";
 import { demoModeEnabled } from "@/lib/demo-config";
+import { SmoothScroll } from "@/components/smooth-scroll";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -35,6 +36,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang={locale} data-scroll-behavior="smooth">
       <body>
+        <SmoothScroll />
         {demo && (
           <div className="demo-preview-bar" data-demo-preview>
             <strong>Demo Preview</strong>
