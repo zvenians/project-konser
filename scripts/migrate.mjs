@@ -3,7 +3,7 @@ import path from "node:path";
 import postgres from "postgres";
 
 const target=process.env.DB_TARGET ?? "development";
-const url=target === "demo" ? process.env.DEMO_DATABASE_URL : process.env.DATABASE_URL;
+const url=target === "demo" ? (process.env.DEMO_DATABASE_URL || process.env.DEMO_DATABASE_DATABASE_URL) : process.env.DATABASE_URL;
 if (!url) throw new Error(target === "demo" ? "DEMO_DATABASE_URL diperlukan" : "DATABASE_URL diperlukan");
 if (target === "production" && process.env.CONFIRM_PRODUCTION_MIGRATION !== "APPLY")
   throw new Error("Set CONFIRM_PRODUCTION_MIGRATION=APPLY setelah backup diverifikasi");

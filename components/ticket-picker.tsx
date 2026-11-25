@@ -153,7 +153,7 @@ export function TicketPicker({
                   <p>
                     {option.mode === "VENUE" ? t.venue : t.stream} ·{" "}
                     {option.active
-                      ? `${option.available} ${t.available}`
+                      ? option.capacity === null ? t.available : `${option.available} ${t.available}`
                       : option.soldOut
                         ? t.sold
                         : t.unavailable}

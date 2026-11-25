@@ -27,7 +27,7 @@ export default async function AccountPage({
     db()`SELECT o.id,o.status,o.total,o.expires_at,o.created_at,o.demo_historical,p.outcome,p.receipt_label FROM orders o LEFT JOIN demo_payments p ON p.order_id=o.id WHERE o.user_id=${user.id} AND o.is_demo=${demo} ORDER BY o.created_at DESC LIMIT 50`,
     db()`SELECT t.id,c.name,t.barcode FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE o.user_id=${user.id} AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo}`,
     db()`SELECT value FROM site_settings WHERE key='payment_instructions'`,
-    db()`SELECT count(*)::integer AS total FROM stream_entitlements WHERE user_id=${user.id} AND active=true`,
+    db()`SELECT count(*)::integer AS total FROM stream_entitlements s JOIN orders o ON o.id=s.order_id WHERE s.user_id=${user.id} AND s.active=true AND s.revoked_at IS NULL AND o.status='CONFIRMED' AND o.is_demo=${demo}`,
     db()`SELECT n.id,n.status,n.demo_message FROM notification_outbox n JOIN orders o ON o.id=n.order_id WHERE n.user_id=${user.id} AND o.is_demo=${demo} ORDER BY n.created_at DESC LIMIT 20`,
   ]);
   const payment = settingValue<{
@@ -64,6 +64,12 @@ export default async function AccountPage({
           </button>
         </form>
       </div>
+      {stream[0]?.total > 0 && (
+        <div className="demo-result">
+          <strong>{en ? "Your livestream access is active." : "Akses livestream Anda aktif."}</strong>{" "}
+          <Link href="/livestream">{en ? "Watch Livestream" : "Tonton Livestream"} →</Link>
+        </div>
+      )}
       <nav className="admin-nav" aria-label={t.accountNavigation}>
         <a href="#orders">{t.orders}</a>
         <a href="#tickets">{t.myTickets}</a>

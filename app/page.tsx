@@ -90,7 +90,7 @@ export default async function EventPage() {
   const locale = await getLocale();
   const t = translate(locale, messages);
   const [classes, settings] = await Promise.all([
-    db()`SELECT c.id,c.name,c.mode,c.price,coalesce(c.purchase_limit,c.capacity) AS capacity,c.sale_enabled,e.streaming_ready,
+    db()`SELECT c.id,c.name,c.mode,c.price,c.capacity,c.purchase_limit,c.sale_enabled,e.streaming_ready,
       count(t.id) FILTER(WHERE t.status='AVAILABLE' AND t.is_demo=${demo})::integer AS venue_available,
       coalesce((SELECT sum(i.quantity)::integer FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=c.id AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')),0) AS stream_reserved
       FROM ticket_classes c JOIN events e ON e.id=c.event_id LEFT JOIN ticket_inventory t ON t.class_id=c.id GROUP BY c.id,e.streaming_ready ORDER BY c.price DESC`,
@@ -108,10 +108,10 @@ export default async function EventPage() {
         const row = classes.find(
           (c) => c.name === item.name && c.mode === mode,
         );
-        const capacity = mode === "VENUE" ? item.capacity ?? 0 : Number(row?.capacity ?? 0);
+        const capacity = mode === "VENUE" ? item.capacity ?? 0 : row?.purchase_limit === null ? null : Number(row?.purchase_limit);
         const available = mode === "VENUE"
           ? Number(row?.venue_available ?? 0)
-          : Math.max(0, capacity - Number(row?.stream_reserved ?? 0));
+          : capacity === null ? 2147483647 : Math.max(0, capacity - Number(row?.stream_reserved ?? 0));
         return {
           id: String(row?.id ?? ""),
           name: item.name,

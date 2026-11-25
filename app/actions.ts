@@ -22,6 +22,7 @@ import { DEMO_ACCOUNTS, resetDemoData } from "@/lib/demo-data";
 import { contributionTiers, livestreamPackages, venueClasses } from "@/lib/event";
 import { cartTotal, reservationIsActive } from "@/lib/transactions";
 import { demoCustomerEmail } from "@/lib/demo-identity";
+import { broadcastStates, normalizeStreamConfig } from "@/lib/streaming";
 
 const credentials = z.object({
   email: z.email().max(254),
@@ -167,10 +168,11 @@ export async function reserve(form: FormData) {
       if (ticketClass.mode === "LIVESTREAM" && !ticketClass.streaming_ready)
         throw new Error("Akses livestream belum tersedia.");
       if (ticketClass.mode === "LIVESTREAM") {
-        const purchaseLimit = Number(ticketClass.purchase_limit ?? ticketClass.capacity);
-        const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
-        if (item.quantity + Number(usage.total) > purchaseLimit)
-          throw new Error("Batas paket livestream sudah tercapai.");
+        if (ticketClass.purchase_limit !== null) {
+          const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
+          if (item.quantity + Number(usage.total) > Number(ticketClass.purchase_limit))
+            throw new Error("Batas paket livestream sudah tercapai.");
+        }
       }
       let ticketIds: string[] = [];
       if (ticketClass.mode === "VENUE") {
@@ -495,6 +497,56 @@ export async function setDemoStreamState(form: FormData) {
     await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${admin.id},'DEMO_STREAM_STATE','stream',${JSON.stringify({ state, simulated: true })}::jsonb)`;
   });
   redirect("/admin#stream");
+}
+
+export async function updateLivestreamOperations(form: FormData) {
+  const operator = await requireStreamOperator();
+  const provider = z.enum(["simulation", "youtube", "cloudflare"]).parse(form.get("provider"));
+  const state = z.enum(broadcastStates).parse(form.get("state"));
+  const source = z.string().trim().max(500).optional().parse(form.get("videoSource") || undefined);
+  let videoId = source;
+  if (provider === "youtube" && source) {
+    const match = source.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/|live\/))([A-Za-z0-9_-]{11})/) || source.match(/^([A-Za-z0-9_-]{11})$/);
+    if (!match) throw new Error("URL atau ID YouTube tidak valid.");
+    videoId = match[1];
+  }
+  const scheduledStart = z.iso.datetime({ offset: true }).parse(form.get("scheduledStart"));
+  const scheduledEnd = z.iso.datetime({ offset: true }).parse(form.get("scheduledEnd"));
+  if (Date.parse(scheduledEnd) <= Date.parse(scheduledStart)) throw new Error("Waktu selesai harus setelah waktu mulai.");
+  const sessionLimit = z.coerce.number().int().min(1).max(5).parse(form.get("sessionLimit"));
+  const maintenanceMessage = z.string().trim().max(300).parse(form.get("maintenanceMessage") || "");
+  const [existing] = await db()`SELECT value FROM site_settings WHERE key='stream'`;
+  const current = normalizeStreamConfig(settingValue(existing?.value));
+  const value = { ...current, provider, state, videoId, scheduledStart, scheduledEnd, sessionLimit, maintenanceMessage, viewerAccess: form.get("viewerAccess") === "on" };
+  await db().begin(async (tx) => {
+    await tx`INSERT INTO site_settings(key,value) VALUES ('stream',${JSON.stringify(value)}::jsonb) ON CONFLICT(key) DO UPDATE SET value=excluded.value`;
+    await tx`UPDATE events SET streaming_ready=${Boolean(videoId || provider === "simulation")}`;
+    if (!value.viewerAccess || ["ENDED", "NOT_STARTED"].includes(state)) await tx`UPDATE stream_viewer_sessions SET active=false,ended_at=now() WHERE active=true`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${operator.id},'UPDATE_LIVESTREAM_OPERATIONS','stream',${JSON.stringify({ provider, state, viewerAccess: value.viewerAccess, sessionLimit })}::jsonb)`;
+  });
+  redirect("/admin/livestream?saved=1");
+}
+
+export async function revokeStreamEntitlement(form: FormData) {
+  const operator = await requireStreamOperator();
+  const id = z.uuid().parse(form.get("entitlementId"));
+  await db().begin(async (tx) => {
+    const [row] = await tx`UPDATE stream_entitlements SET active=false,revoked_at=now(),revoked_by=${operator.id} WHERE id=${id} RETURNING user_id,event_id`;
+    if (!row) throw new Error("Hak akses tidak ditemukan.");
+    await tx`UPDATE stream_viewer_sessions SET active=false,ended_at=now() WHERE user_id=${row.user_id} AND event_id=${row.event_id} AND active=true`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id) VALUES (${operator.id},'REVOKE_STREAM_ENTITLEMENT',${id})`;
+  });
+  redirect("/admin/livestream");
+}
+
+export async function endViewerSession(form: FormData) {
+  const operator = await requireStreamOperator();
+  const id = z.uuid().parse(form.get("sessionId"));
+  await db().begin(async (tx) => {
+    await tx`UPDATE stream_viewer_sessions SET active=false,ended_at=now() WHERE id=${id}`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id) VALUES (${operator.id},'END_STREAM_VIEWER_SESSION',${id})`;
+  });
+  redirect("/admin/livestream");
 }
 
 export async function setTicketSale(form: FormData) {

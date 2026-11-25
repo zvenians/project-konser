@@ -121,7 +121,7 @@ export default async function AdminPage({
         {canViewFinance && <a href="#payments">{t.payments}</a>}
         {canViewFinance && <a href="#donations">{t.donations}</a>}
         {canViewFinance && <a href="#notifications">{t.notifications}</a>}
-        {canOperateStream && <a href="#stream">Livestream</a>}
+        {canOperateStream && <a href="/admin/livestream">Livestream Ops ↗</a>}
         {user.role === "ADMIN" && <a href="#settings">{t.settings}</a>}
         {user.role === "ADMIN" && <a href="#users">{t.users}</a>}
       </nav>
