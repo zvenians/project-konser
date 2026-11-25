@@ -49,7 +49,7 @@ const messages = {
     donateText:
       "Donasi dicatat terpisah dari pembelian tiket dan diverifikasi sebelum diakui.",
     donateAction: "Lihat donasi",
-    account: "Akun saya",
+    account: "Claim Ticket",
   },
   en: {
     by: "By",
@@ -81,7 +81,7 @@ const messages = {
     donateText:
       "Donations are recorded separately from ticket purchases and verified before recognition.",
     donateAction: "View donations",
-    account: "My account",
+    account: "Claim Ticket",
   },
 };
 
@@ -282,7 +282,7 @@ export default async function EventPage() {
       <footer className="event-footer">
         <div className="event-container">
           <span>© 2026 Symphony of Faith</span>
-          <a href="/account">{t.account}</a>
+          <a href="/claim-ticket">{t.account}</a>
           <a href={event.instagram} target="_blank" rel="noopener noreferrer">
             Instagram <Share2 size={14} />
           </a>
