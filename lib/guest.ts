@@ -40,6 +40,6 @@ export const newGuestToken = () => randomBytes(32).toString("base64url");
 export async function currentClaim(scope: "TICKET" | "LIVESTREAM") {
   const token = (await cookies()).get("sof_claim")?.value;
   if (!token) return null;
-  const [session] = await db()`SELECT destination_hash FROM claim_sessions WHERE token_hash=${tokenDigest(token)} AND scope=${scope} AND expires_at>now()`;
+  const [session] = await db()`SELECT id,destination_hash FROM claim_sessions WHERE token_hash=${tokenDigest(token)} AND scope=${scope} AND revoked_at IS NULL AND expires_at>now()`;
   return session ?? null;
 }
