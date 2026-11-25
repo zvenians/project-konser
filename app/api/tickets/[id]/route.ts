@@ -1,12 +1,13 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { demoModeEnabled } from "@/lib/demo-config";
 import { demoTicketTitle } from "@/lib/demo-ticket";
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import QRCode from "qrcode";
+import { currentClaim } from "@/lib/guest";
 
 async function createDemoTicket(ticket: {
   id: string;
@@ -47,11 +48,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUser();
+    const user = await currentUser();
+    const claim = await currentClaim("TICKET");
+    if (!user && !claim) throw new Error("Akses ditolak.");
     const demo = demoModeEnabled();
     const id = z.uuid().parse((await params).id);
     const [ticket] =
-      await db()`SELECT t.id,t.file_key,t.original_name,t.barcode,t.is_demo,c.name,o.id AS order_id FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE t.id=${id} AND o.user_id=${user.id} AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo} AND o.is_demo=${demo}`;
+      await db()`SELECT t.id,t.file_key,t.original_name,t.barcode,t.is_demo,c.name,o.id AS order_id FROM ticket_inventory t JOIN ticket_allocations a ON a.ticket_id=t.id JOIN order_items i ON i.id=a.item_id JOIN orders o ON o.id=i.order_id JOIN ticket_classes c ON c.id=i.class_id WHERE t.id=${id} AND ((${user?.id ?? null}::uuid IS NOT NULL AND o.user_id=${user?.id ?? null}) OR (${claim?.destination_hash ?? null}::text IS NOT NULL AND encode(digest(o.buyer_phone,'sha256'),'hex')=${claim?.destination_hash ?? null})) AND o.status='CONFIRMED' AND t.status='SOLD' AND t.is_demo=${demo} AND o.is_demo=${demo}`;
     if (!ticket)
       return NextResponse.json(
         { error: "Tiket tidak ditemukan." },

@@ -1,7 +1,7 @@
 import postgres from "postgres";
 
 const target = process.env.DB_TARGET ?? "production";
-const url = target === "demo" ? process.env.DEMO_DATABASE_URL : process.env.DATABASE_URL;
+const url = target === "demo" ? (process.env.DEMO_DATABASE_URL || process.env.DEMO_DATABASE_DATABASE_URL) : process.env.DATABASE_URL;
 if (!url) throw new Error(target === "demo" ? "DEMO_DATABASE_URL diperlukan" : "DATABASE_URL diperlukan");
 if (process.env.DATABASE_URL && process.env.DEMO_DATABASE_URL && process.env.DATABASE_URL === process.env.DEMO_DATABASE_URL)
   throw new Error("Database demo dan produksi tidak boleh sama");
@@ -20,17 +20,18 @@ const expectedStreams = new Map([
 ]);
 
 try {
-  const migrations = await sql`SELECT name FROM schema_migrations WHERE name IN ('012-official-catalog.sql','013-contribution-tiers.sql','014-production-readiness.sql') ORDER BY name`;
-  if (migrations.length !== 3) throw new Error("Migrasi 012, 013, atau 014 belum lengkap");
-  const classes = await sql`SELECT name,mode,price,capacity,purchase_limit FROM ticket_classes ORDER BY mode,name`;
+  const migrations = await sql`SELECT name FROM schema_migrations WHERE name IN ('012-official-catalog.sql','013-contribution-tiers.sql','014-production-readiness.sql','015-livestream-operations.sql') ORDER BY name`;
+  if (migrations.length !== 4) throw new Error("Migrasi 012–015 belum lengkap");
+  const classes = await sql`SELECT name,mode,price,capacity,purchase_limit,sales_target FROM ticket_classes ORDER BY mode,name`;
   for (const [name, [capacity, price]] of expectedVenue) {
     const row = classes.find((item) => item.mode === "VENUE" && item.name === name);
     if (!row || Number(row.capacity) !== capacity || Number(row.price) !== price)
       throw new Error(`Katalog venue ${name} tidak sesuai`);
   }
+  const targets = new Map([["Simfoni Iman",50],["Simfoni Agung",100],["Simfoni Harapan",50],["Simfoni Pujian",500],["Simfoni Syukur",1000],["Simfoni Kasih",5000],["Simfoni Setia",3000]]);
   for (const [name, price] of expectedStreams) {
     const row = classes.find((item) => item.mode === "LIVESTREAM" && item.name === name);
-    if (!row || Number(row.price) !== price || Number(row.purchase_limit ?? row.capacity) <= 0)
+    if (!row || Number(row.price) !== price || Number(row.sales_target) !== targets.get(name) || row.purchase_limit !== null)
       throw new Error(`Katalog livestream ${name} tidak sesuai`);
   }
   console.log(JSON.stringify({ status: "ok", target, migrations: migrations.map((row) => row.name), venueCapacity: 1685, livestreamPackages: 7 }));

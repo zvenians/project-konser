@@ -834,6 +834,27 @@
 .checkout-loading {
   color: var(--muted);
 }
+
+.buyer-fields { display: grid; gap: 14px; margin: 22px 0; }
+.buyer-fields label,.claim-form label { display: grid; gap: 7px; font-size: .78rem; letter-spacing: .04em; }
+.buyer-fields input,.claim-form input { width: 100%; min-height: 46px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 6px; background: transparent; color: inherit; padding: 10px 12px; }
+.order-confirmation,.claim-page { padding-block: clamp(110px,14vw,170px) 80px; max-width: 920px; }
+.order-confirmation h1,.claim-page h1 { font-family: var(--font-display,serif); font-size: clamp(2.4rem,6vw,5rem); line-height: .95; margin: 12px 0 22px; }
+.order-sheet { margin: 36px 0; border-block: 1px solid color-mix(in srgb,currentColor 18%,transparent); }
+.order-sheet>div { display: grid; grid-template-columns: 130px 1fr auto; gap: 18px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid color-mix(in srgb,currentColor 10%,transparent); }
+.order-sheet small { opacity: .7; }
+.order-sheet .order-total { font-size: 1.25rem; border-bottom: 0; }
+.order-actions,.demo-payment-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.order-actions a,.demo-payment-actions button,.claim-form button { display: inline-flex; min-height: 46px; align-items: center; justify-content: center; border: 1px solid currentColor; border-radius: 6px; padding: 10px 16px; background: var(--gold,#d9ad5b); color: #0b1714; font-weight: 700; }
+.claim-methods { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 28px; margin-top: 38px; }
+.claim-form { padding: 24px; border: 1px solid color-mix(in srgb,currentColor 16%,transparent); border-radius: 10px; display: grid; gap: 18px; }
+.claim-notice { border-left: 3px solid var(--gold,#d9ad5b); padding: 12px 16px; background: color-mix(in srgb,var(--gold,#d9ad5b) 8%,transparent); }
+.claimed-tickets { margin-top: 36px; }
+.claimed-tickets>a { display: grid; grid-template-columns: 1fr auto; gap: 4px 18px; padding: 18px 0; border-bottom: 1px solid color-mix(in srgb,currentColor 14%,transparent); }
+.claimed-tickets>a small { grid-column: 1; opacity: .65; }
+.claimed-tickets>a span { grid-column: 2; grid-row: 1/3; align-self: center; }
+@media (hover:hover) { .order-actions a:hover,.demo-payment-actions button:hover,.claim-form button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgb(0 0 0 / .18); } }
+@media (max-width:640px) { .claim-methods { grid-template-columns: 1fr; }.order-sheet>div { grid-template-columns: 1fr; gap: 4px; } }
 .auth-heading {
   margin: 30px 0;
 }
@@ -1086,3 +1107,4 @@
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
+.stream-room{max-width:1180px;margin:auto;padding:48px 24px 80px}.stream-room-head{display:flex;justify-content:space-between;gap:32px;align-items:end;margin-bottom:28px}.stream-room-head h1{font-size:clamp(2.5rem,7vw,6rem);line-height:.9;margin:.3rem 0}.stream-stage{border-top:1px solid var(--line);padding-top:18px}.stream-status-line{display:flex;align-items:center;gap:10px;font:700 .75rem/1 var(--font-mono);letter-spacing:.12em;margin-bottom:14px}.stream-status-line span:last-child{margin-left:auto;color:var(--muted)}.broadcast-dot{width:9px;height:9px;border-radius:50%;background:#9b8c75}.state-live{background:#e53b31;box-shadow:0 0 0 5px #e53b3122}.state-interrupted{background:#e49c34}.state-ended{background:#777}.stream-frame{aspect-ratio:16/9;background:#07090d;overflow:hidden}.stream-frame iframe,.stream-frame video{border:0;width:100%;height:100%;display:block}.stream-waiting{width:100%;height:100%;background-size:cover;background-position:center;display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(24px,6vw,72px);color:white}.stream-waiting h2{font-size:clamp(2rem,5vw,4.5rem);max-width:800px;margin:.2rem 0}.stream-waiting strong{font:600 clamp(1.1rem,3vw,2.2rem)/1 var(--font-mono)}.stream-feedback{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}.stream-feedback.error{color:#b63830}.stream-feedback div{display:flex;gap:8px}.stream-notice{font-size:.82rem;color:var(--muted);max-width:850px}.stream-instructions{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin-top:42px}.stream-instructions>div{background:var(--background);padding:28px}.stream-instructions h2{margin:.35rem 0}@media(max-width:720px){.stream-room{padding:28px 16px 64px}.stream-room-head{display:block}.stream-room-head>a{display:inline-block;margin-top:18px}.stream-frame{aspect-ratio:16/10}.stream-waiting{padding:20px}.stream-instructions{grid-template-columns:1fr}.stream-feedback{align-items:flex-start;flex-direction:column}}

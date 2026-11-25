@@ -5,6 +5,7 @@ import { resolveDatabaseUrl } from "../lib/database-target.ts";
 import { hasCapability } from "../lib/permissions.ts";
 import { cartTotal, reservationIsActive } from "../lib/transactions.ts";
 import { demoCustomerEmail, regularLoginRoleAllowed } from "../lib/demo-identity.ts";
+import { normalizeStreamConfig } from "../lib/streaming.ts";
 
 test("demo and production databases are isolated", () => {
   const production = "postgres://prod";
@@ -33,6 +34,28 @@ test("homepage renders only one shared cart summary", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(source, /cartOptions=\{\[\.\.\.venueOptions, \.\.\.streamOptions\]\}/);
   assert.equal((source.match(/showCart=\{false\}/g) || []).length, 1);
+});
+
+test("livestream broadcast state is explicit and never inferred from time", () => {
+  const config = normalizeStreamConfig({ provider: "youtube", state: "WAITING", viewerAccess: true, sessionLimit: 1 });
+  assert.equal(config.state, "WAITING");
+  assert.equal(config.provider, "youtube");
+  assert.equal(config.viewerAccess, true);
+});
+
+test("migration revokes access for terminal order states and preserves sales targets", async () => {
+  const source = await readFile(new URL("../db/migrations/015-livestream-operations.sql", import.meta.url), "utf8");
+  assert.match(source, /'CANCELLED','EXPIRED','FAILED','REFUNDED'/);
+  assert.match(source, /WHEN 'Simfoni Kasih' THEN 5000/);
+  assert.match(source, /purchase_limit=NULL/);
+});
+
+test("livestream access route validates confirmed livestream entitlement", async () => {
+  const source = await readFile(new URL("../app/api/livestream/access/route.ts", import.meta.url), "utf8");
+  assert.match(source, /o\.status='CONFIRMED'/);
+  assert.match(source, /c\.mode='LIVESTREAM'/);
+  assert.match(source, /s\.revoked_at IS NULL/);
+  assert.match(source, /SESSION_LIMIT_REACHED/);
 });
 
 test("expired reservations cannot be paid", () => {

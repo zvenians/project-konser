@@ -3,6 +3,7 @@
 import { compare, hash } from "bcryptjs";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { expireReservations } from "@/lib/orders";
@@ -22,6 +23,8 @@ import { DEMO_ACCOUNTS, resetDemoData } from "@/lib/demo-data";
 import { contributionTiers, livestreamPackages, venueClasses } from "@/lib/event";
 import { cartTotal, reservationIsActive } from "@/lib/transactions";
 import { demoCustomerEmail } from "@/lib/demo-identity";
+import { broadcastStates, normalizeStreamConfig } from "@/lib/streaming";
+import { guestOrderTokenHash, newGuestToken, normalizePhone, setGuestOrderToken, tokenDigest } from "@/lib/guest";
 
 const credentials = z.object({
   email: z.email().max(254),
@@ -102,9 +105,66 @@ export async function logout() {
   redirect("/");
 }
 
+const claimRequest = z.object({
+  channel: z.enum(["WHATSAPP", "EMAIL"]),
+  scope: z.enum(["TICKET", "LIVESTREAM"]),
+  destination: z.string().trim().min(5).max(254),
+});
+
+export async function requestClaim(form: FormData) {
+  const values = claimRequest.parse(Object.fromEntries(form));
+  const destination = values.channel === "WHATSAPP"
+    ? normalizePhone(values.destination)
+    : z.email().parse(values.destination).toLowerCase();
+  const destinationHash = tokenDigest(destination);
+  if (values.channel === "EMAIL" && values.scope === "TICKET") {
+    const orders = await db()`SELECT id FROM orders WHERE lower(buyer_email)=${destination} AND status='CONFIRMED' AND is_demo=${demoModeEnabled()} AND EXISTS (SELECT 1 FROM order_items i JOIN ticket_classes c ON c.id=i.class_id WHERE i.order_id=orders.id AND c.mode='VENUE')`;
+    for (const order of orders)
+      await db()`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status) VALUES (${order.id},'EMAIL','TICKET_RESEND',${destination},${demoModeEnabled() ? "SIMULATED" : "PENDING"}) ON CONFLICT DO UPDATE SET status=excluded.status,next_attempt_at=now(),updated_at=now()`;
+    redirect("/claim-ticket?sent=1");
+  }
+  const [recent] = await db()`SELECT created_at FROM claim_otps WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} ORDER BY created_at DESC LIMIT 1`;
+  if (recent && Date.now() - new Date(recent.created_at).getTime() < 60_000)
+    redirect("/claim-ticket?cooldown=1");
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  await db().begin(async (tx) => {
+    await tx`UPDATE claim_otps SET used_at=now() WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} AND used_at IS NULL`;
+    await tx`INSERT INTO claim_otps(destination_hash,channel,scope,code_hash,expires_at) VALUES (${destinationHash},${values.channel},${values.scope},${await hash(code, 12)},now()+interval '5 minutes')`;
+    const orders = await tx`SELECT id FROM orders WHERE status='CONFIRMED' AND is_demo=${demoModeEnabled()} AND (${values.channel}='WHATSAPP' AND buyer_phone=${destination} OR ${values.channel}='EMAIL' AND lower(buyer_email)=${destination})`;
+    for (const order of orders)
+      await tx`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status,payload) VALUES (${order.id},${values.channel},${`${values.scope}_OTP`},${destination},${demoModeEnabled() ? "SIMULATED" : "PENDING"},${JSON.stringify({ code, expiresInMinutes: 5 })}::jsonb) ON CONFLICT DO UPDATE SET status=excluded.status,payload=excluded.payload,next_attempt_at=now(),updated_at=now()`;
+  });
+  redirect(`/claim-ticket?otp=1&channel=${values.channel}&scope=${values.scope}${demoModeEnabled() ? `&demoCode=${code}` : ""}`);
+}
+
+export async function verifyClaim(form: FormData) {
+  const values = claimRequest.extend({ code: z.string().regex(/^\d{6}$/) }).parse(Object.fromEntries(form));
+  const destination = values.channel === "WHATSAPP" ? normalizePhone(values.destination) : z.email().parse(values.destination).toLowerCase();
+  const destinationHash = tokenDigest(destination);
+  const [otp] = await db()`SELECT id,code_hash,attempts FROM claim_otps WHERE destination_hash=${destinationHash} AND channel=${values.channel} AND scope=${values.scope} AND used_at IS NULL AND expires_at>now() ORDER BY created_at DESC LIMIT 1`;
+  if (!otp || otp.attempts >= 5 || !(await compare(values.code, otp.code_hash))) {
+    if (otp) await db()`UPDATE claim_otps SET attempts=attempts+1 WHERE id=${otp.id}`;
+    throw new Error("Kode tidak valid atau sudah kedaluwarsa.");
+  }
+  const token = newGuestToken();
+  await db().begin(async (tx) => {
+    await tx`UPDATE claim_otps SET used_at=now() WHERE id=${otp.id}`;
+    await tx`INSERT INTO claim_sessions(token_hash,destination_hash,scope,expires_at) VALUES (${tokenDigest(token)},${destinationHash},${values.scope},now()+interval '30 minutes')`;
+  });
+  (await cookies()).set("sof_claim", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 1800 });
+  redirect(values.scope === "LIVESTREAM" ? "/livestream" : "/claim-ticket?verified=1");
+}
+
 export async function reserve(form: FormData) {
-  const user = await requireUser();
   const demo = demoModeEnabled();
+  const buyer = z.object({
+    name: z.string().trim().min(2).max(100),
+    phone: z.string().trim().min(8).max(30),
+    email: z.preprocess((value) => value === "" ? undefined : value, z.email().max(254).optional()),
+  }).parse({ name: form.get("name"), phone: form.get("phone"), email: form.get("email") });
+  const phone = normalizePhone(buyer.phone);
+  const email = buyer.email?.toLowerCase() ?? null;
+  const guestToken = newGuestToken();
   await expireReservations();
   const [instructions] =
     await db()`SELECT value FROM site_settings WHERE key='payment_instructions'`;
@@ -129,12 +189,13 @@ export async function reserve(form: FormData) {
     throw new Error("Kelas tiket duplikat.");
   const key = z.uuid().parse(form.get("idempotencyKey"));
   const sql = db();
+  let createdOrderId = "";
   await sql.begin(async (tx) => {
     const [previous] =
-      await tx`SELECT id,user_id FROM orders WHERE idempotency_key=${key}`;
+      await tx`SELECT id,guest_token_hash FROM orders WHERE idempotency_key=${key}`;
     if (previous) {
-      if (previous.user_id !== user.id)
-        throw new Error("Permintaan sudah dipakai.");
+      createdOrderId = previous.id;
+      await tx`UPDATE orders SET guest_token_hash=${tokenDigest(guestToken)} WHERE id=${previous.id}`;
       return;
     }
     const allocations: { itemId: string; ticketId: string }[] = [];
@@ -167,10 +228,11 @@ export async function reserve(form: FormData) {
       if (ticketClass.mode === "LIVESTREAM" && !ticketClass.streaming_ready)
         throw new Error("Akses livestream belum tersedia.");
       if (ticketClass.mode === "LIVESTREAM") {
-        const purchaseLimit = Number(ticketClass.purchase_limit ?? ticketClass.capacity);
-        const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
-        if (item.quantity + Number(usage.total) > purchaseLimit)
-          throw new Error("Batas paket livestream sudah tercapai.");
+        if (ticketClass.purchase_limit !== null) {
+          const [usage] = await tx`SELECT coalesce(sum(i.quantity),0)::integer AS total FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.class_id=${item.classId} AND o.is_demo=${demo} AND o.status IN ('PENDING','PAYMENT_REVIEW','CONFIRMED')`;
+          if (item.quantity + Number(usage.total) > Number(ticketClass.purchase_limit))
+            throw new Error("Batas paket livestream sudah tercapai.");
+        }
       }
       let ticketIds: string[] = [];
       if (ticketClass.mode === "VENUE") {
@@ -189,33 +251,38 @@ export async function reserve(form: FormData) {
         mode: ticketClass.mode,
       });
     }
+    if (prepared.some((item) => item.mode === "LIVESTREAM") && !email)
+      throw new Error("Email wajib untuk pesanan livestream.");
     const total = cartTotal(prepared);
     const [order] =
-      await tx`INSERT INTO orders(user_id,idempotency_key,total,expires_at,is_demo) VALUES (${user.id},${key},${total},now()+interval '24 hours',${demo}) RETURNING id`;
+      await tx`INSERT INTO orders(user_id,idempotency_key,total,expires_at,is_demo,buyer_name,buyer_phone,buyer_email,guest_token_hash) VALUES (NULL,${key},${total},now()+interval '24 hours',${demo},${buyer.name},${phone},${email},${tokenDigest(guestToken)}) RETURNING id`;
+    createdOrderId = order.id;
     for (const item of prepared) {
       const [orderItem] =
         await tx`INSERT INTO order_items(order_id,class_id,quantity,unit_price) VALUES (${order.id},${item.classId},${item.quantity},${item.price}) RETURNING id`;
       for (const ticketId of item.ticketIds)
         allocations.push({ itemId: orderItem.id, ticketId });
       if (item.mode === "LIVESTREAM")
-        await tx`INSERT INTO stream_entitlements(user_id,event_id,order_id) VALUES (${user.id},${item.eventId},${order.id}) ON CONFLICT DO NOTHING`;
+        await tx`INSERT INTO stream_entitlements(user_id,event_id,order_id) VALUES (NULL,${item.eventId},${order.id}) ON CONFLICT DO NOTHING`;
     }
     for (const allocation of allocations) {
       await tx`UPDATE ticket_inventory SET status='RESERVED' WHERE id=${allocation.ticketId}`;
       await tx`INSERT INTO ticket_allocations(ticket_id,item_id) VALUES (${allocation.ticketId},${allocation.itemId})`;
     }
   });
-  redirect("/account?reserved=1");
+  await setGuestOrderToken(guestToken);
+  redirect(`/orders/${createdOrderId}`);
 }
 
 export async function simulateDemoPayment(form: FormData) {
   requireDemoMode();
-  const user = await requireUser();
-  if (!user.is_demo) throw new Error("Akun ini bukan akun demo.");
+  const user = await currentUser();
+  const tokenHash = await guestOrderTokenHash();
+  if (user && !user.is_demo) throw new Error("Akun ini bukan akun demo.");
   const orderId = z.uuid().parse(form.get("orderId"));
   const outcome = z.enum(["SUCCESS", "FAILED", "CANCELLED"]).parse(form.get("outcome"));
   const result = await db().begin(async (tx) => {
-    const [order] = await tx`SELECT id,user_id,status,total,expires_at FROM orders WHERE id=${orderId} AND user_id=${user.id} AND is_demo=true FOR UPDATE`;
+    const [order] = await tx`SELECT id,user_id,status,total,expires_at,buyer_phone,buyer_email FROM orders WHERE id=${orderId} AND is_demo=true AND ((${user?.id ?? null}::uuid IS NOT NULL AND user_id=${user?.id ?? null}) OR (${tokenHash}::text IS NOT NULL AND guest_token_hash=${tokenHash})) FOR UPDATE`;
     if (!order) throw new Error("Pesanan demo tidak ditemukan.");
     const [existing] = await tx`SELECT outcome FROM demo_payments WHERE order_id=${orderId}`;
     if (existing) {
@@ -228,7 +295,7 @@ export async function simulateDemoPayment(form: FormData) {
       await tx`UPDATE ticket_inventory SET status='AVAILABLE' WHERE is_demo=true AND id IN (SELECT a.ticket_id FROM ticket_allocations a JOIN order_items i ON i.id=a.item_id WHERE i.order_id=${orderId})`;
       await tx`DELETE FROM ticket_allocations WHERE item_id IN (SELECT id FROM order_items WHERE order_id=${orderId})`;
       await tx`UPDATE stream_entitlements SET active=false WHERE order_id=${orderId}`;
-      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING','EXPIRED')`;
+      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user?.id ?? null},'PENDING','EXPIRED')`;
       return { expired: true };
     }
     await tx`INSERT INTO demo_payments(order_id,outcome,receipt_label) VALUES (${orderId},${outcome},'SIMULATED')`;
@@ -246,21 +313,23 @@ export async function simulateDemoPayment(form: FormData) {
           url: `/api/tickets/${ticket.id}`,
         })),
       };
-      await tx`INSERT INTO notification_outbox(order_id,kind,status,user_id,recipient,demo_message) VALUES (${orderId},'PAYMENT_CONFIRMED','SIMULATED_DELIVERED',${user.id},'DEMO ONLY',${JSON.stringify(message)}::jsonb) ON CONFLICT(order_id,kind) DO NOTHING`;
-      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING','CONFIRMED')`;
+      await tx`INSERT INTO notification_outbox(order_id,kind,status,user_id,recipient,demo_message) VALUES (${orderId},'PAYMENT_CONFIRMED','SIMULATED_DELIVERED',${user?.id ?? null},'DEMO ONLY',${JSON.stringify(message)}::jsonb) ON CONFLICT(order_id,kind) DO NOTHING`;
+      if (order.buyer_phone) await tx`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status) VALUES (${orderId},'WHATSAPP','ORDER_FULFILLMENT',${order.buyer_phone},'SIMULATED') ON CONFLICT DO NOTHING`;
+      if (order.buyer_email) await tx`INSERT INTO delivery_jobs(order_id,channel,kind,recipient,status) VALUES (${orderId},'EMAIL','ORDER_FULFILLMENT',${order.buyer_email},'SIMULATED') ON CONFLICT DO NOTHING`;
+      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user?.id ?? null},'PENDING','CONFIRMED')`;
     } else {
       const status = outcome === "FAILED" ? "FAILED" : "CANCELLED";
       await tx`UPDATE orders SET status=${status} WHERE id=${orderId}`;
       await tx`UPDATE ticket_inventory SET status='AVAILABLE' WHERE is_demo=true AND id IN (SELECT a.ticket_id FROM ticket_allocations a JOIN order_items i ON i.id=a.item_id WHERE i.order_id=${orderId})`;
       await tx`DELETE FROM ticket_allocations WHERE item_id IN (SELECT id FROM order_items WHERE order_id=${orderId})`;
       await tx`UPDATE stream_entitlements SET active=false WHERE order_id=${orderId}`;
-      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user.id},'PENDING',${status})`;
+      await tx`INSERT INTO order_status_history(order_id,actor_id,from_status,to_status) VALUES (${orderId},${user?.id ?? null},'PENDING',${status})`;
     }
-    await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${user.id},'DEMO_PAYMENT',${orderId},${JSON.stringify({ outcome, simulated: true })}::jsonb)`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${user?.id ?? null},'DEMO_PAYMENT',${orderId},${JSON.stringify({ outcome, simulated: true })}::jsonb)`;
     return { expired: false };
   });
   if (result.expired) throw new Error("Reservasi demo sudah kedaluwarsa. Stok telah dipulihkan.");
-  redirect(`/account?demoPayment=${outcome.toLowerCase()}`);
+  redirect(`/orders/${orderId}?payment=${outcome.toLowerCase()}`);
 }
 
 export async function submitDemoDonation(form: FormData) {
@@ -495,6 +564,56 @@ export async function setDemoStreamState(form: FormData) {
     await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${admin.id},'DEMO_STREAM_STATE','stream',${JSON.stringify({ state, simulated: true })}::jsonb)`;
   });
   redirect("/admin#stream");
+}
+
+export async function updateLivestreamOperations(form: FormData) {
+  const operator = await requireStreamOperator();
+  const provider = z.enum(["simulation", "youtube", "cloudflare"]).parse(form.get("provider"));
+  const state = z.enum(broadcastStates).parse(form.get("state"));
+  const source = z.string().trim().max(500).optional().parse(form.get("videoSource") || undefined);
+  let videoId = source;
+  if (provider === "youtube" && source) {
+    const match = source.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/|live\/))([A-Za-z0-9_-]{11})/) || source.match(/^([A-Za-z0-9_-]{11})$/);
+    if (!match) throw new Error("URL atau ID YouTube tidak valid.");
+    videoId = match[1];
+  }
+  const scheduledStart = z.iso.datetime({ offset: true }).parse(form.get("scheduledStart"));
+  const scheduledEnd = z.iso.datetime({ offset: true }).parse(form.get("scheduledEnd"));
+  if (Date.parse(scheduledEnd) <= Date.parse(scheduledStart)) throw new Error("Waktu selesai harus setelah waktu mulai.");
+  const sessionLimit = z.coerce.number().int().min(1).max(5).parse(form.get("sessionLimit"));
+  const maintenanceMessage = z.string().trim().max(300).parse(form.get("maintenanceMessage") || "");
+  const [existing] = await db()`SELECT value FROM site_settings WHERE key='stream'`;
+  const current = normalizeStreamConfig(settingValue(existing?.value));
+  const value = { ...current, provider, state, videoId, scheduledStart, scheduledEnd, sessionLimit, maintenanceMessage, viewerAccess: form.get("viewerAccess") === "on" };
+  await db().begin(async (tx) => {
+    await tx`INSERT INTO site_settings(key,value) VALUES ('stream',${JSON.stringify(value)}::jsonb) ON CONFLICT(key) DO UPDATE SET value=excluded.value`;
+    await tx`UPDATE events SET streaming_ready=${Boolean(videoId || provider === "simulation")}`;
+    if (!value.viewerAccess || ["ENDED", "NOT_STARTED"].includes(state)) await tx`UPDATE stream_viewer_sessions SET active=false,ended_at=now() WHERE active=true`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id,details) VALUES (${operator.id},'UPDATE_LIVESTREAM_OPERATIONS','stream',${JSON.stringify({ provider, state, viewerAccess: value.viewerAccess, sessionLimit })}::jsonb)`;
+  });
+  redirect("/admin/livestream?saved=1");
+}
+
+export async function revokeStreamEntitlement(form: FormData) {
+  const operator = await requireStreamOperator();
+  const id = z.uuid().parse(form.get("entitlementId"));
+  await db().begin(async (tx) => {
+    const [row] = await tx`UPDATE stream_entitlements SET active=false,revoked_at=now(),revoked_by=${operator.id} WHERE id=${id} RETURNING user_id,event_id`;
+    if (!row) throw new Error("Hak akses tidak ditemukan.");
+    await tx`UPDATE stream_viewer_sessions SET active=false,ended_at=now() WHERE user_id=${row.user_id} AND event_id=${row.event_id} AND active=true`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id) VALUES (${operator.id},'REVOKE_STREAM_ENTITLEMENT',${id})`;
+  });
+  redirect("/admin/livestream");
+}
+
+export async function endViewerSession(form: FormData) {
+  const operator = await requireStreamOperator();
+  const id = z.uuid().parse(form.get("sessionId"));
+  await db().begin(async (tx) => {
+    await tx`UPDATE stream_viewer_sessions SET active=false,ended_at=now() WHERE id=${id}`;
+    await tx`INSERT INTO audit_logs(actor_id,action,resource_id) VALUES (${operator.id},'END_STREAM_VIEWER_SESSION',${id})`;
+  });
+  redirect("/admin/livestream");
 }
 
 export async function setTicketSale(form: FormData) {

@@ -33,12 +33,10 @@ function Submit({ locale }: { locale: Locale }) {
 export function CheckoutCart({
   options,
   locale,
-  authenticated,
   idempotencyKey,
 }: {
   options: Option[];
   locale: Locale;
-  authenticated: boolean;
   idempotencyKey: string;
 }) {
   const [cart, setCart] = useCart();
@@ -156,8 +154,21 @@ export function CheckoutCart({
               : "Your selection changed. Remove or adjust unavailable tickets."}
           </p>
         )}
-        {authenticated ? (
-          <form action={reserve}>
+          <form action={reserve} className="buyer-form">
+            <div className="buyer-fields">
+              <label>
+                <span>{locale === "id" ? "Nama lengkap" : "Full name"}</span>
+                <input name="name" autoComplete="name" minLength={2} maxLength={100} required />
+              </label>
+              <label>
+                <span>WhatsApp</span>
+                <input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="0812 3456 7890" required />
+              </label>
+              <label>
+                <span>{locale === "id" ? "Email (wajib untuk livestream)" : "Email (required for livestream)"}</span>
+                <input name="email" type="email" autoComplete="email" required={selected.some((item) => item.mode === "LIVESTREAM")} />
+              </label>
+            </div>
             <input
               type="hidden"
               name="items"
@@ -173,14 +184,6 @@ export function CheckoutCart({
               <Submit locale={locale} />
             </fieldset>
           </form>
-        ) : (
-          <Link className="checkout-auth" href="/login?next=checkout">
-            {locale === "id"
-              ? "Masuk atau daftar untuk melanjutkan"
-              : "Sign in or register to continue"}
-            <ArrowRight size={16} />
-          </Link>
-        )}
       </aside>
     </div>
   );
