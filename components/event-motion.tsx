@@ -26,11 +26,17 @@ export function EventMotion() {
           { opacity: 0, y: 20 },
           { opacity: 1, y: 0, duration: 0.55, stagger: 0.07 },
           "-=.58",
+        )
+        .fromTo(
+          ".event-facts",
+          { opacity: 0, y: 22 },
+          { opacity: 1, y: 0, duration: 0.65 },
+          "-=.38",
         );
 
       gsap.utils
         .toArray<HTMLElement>(
-          ".product-section-intro, .picker-rows, .contribution-tier-grid, .event-info, .event-side-info section",
+          ".event-manifesto > *, .product-section-intro, .picker-rows, .contribution-tier-grid, .event-info, .event-side-info section",
         )
         .forEach((element) => {
           gsap.fromTo(

@@ -26,34 +26,36 @@ const messages = {
     tickets: "Lihat tiket",
     venueTickets: "Tiket venue",
     venueTicketsText:
-      "Pilih kursi untuk hadir langsung di Tiara Convention Hall.",
+      "Pilih kategori tiket dan nikmati konsernya langsung di Tiara Convention Hall.",
     livestreamPackages: "Paket livestream",
     livestreamPackagesText:
-      "Nikmati siaran konser dari mana saja dengan akses digital terpisah.",
+      "Nonton dari mana saja lewat akses digital yang disiapkan khusus untuk konser ini.",
     contributionProgram: "Program kontribusi",
     contributionProgramText:
-      "Dukung karya dan pelayanan melalui kontribusi yang terpisah dari pembelian tiket.",
+      "Kalau ingin ikut mendukung lebih jauh, pilih kontribusi yang paling sesuai untukmu.",
     share: "Bagikan",
     about: "Tentang acara",
     aboutText:
-      "Symphony of Faith adalah konser amal di Medan yang mempertemukan musik, iman, dan kepedulian. Informasi resmi mengenai program amal akan disampaikan oleh penyelenggara.",
+      "Symphony of Faith adalah konser amal di Medan yang mempertemukan musik, iman, dan kepedulian dalam satu malam yang bermakna.",
     details: "Informasi acara",
     ticketInfo:
-      "Tiket venue diterbitkan setelah pembayaran diverifikasi. Tiket livestream memberikan akses siaran setelah penyelenggara mengaktifkannya.",
+      "Tiket venue akan terbit setelah pembayaran terverifikasi. Untuk livestream, akses menonton akan terbuka saat siaran diaktifkan.",
     venueInfo: "Lokasi",
     directions: "Buka peta",
     organizer: "Penyelenggara",
     contact: "Instagram resmi",
     social: "Kanal resmi",
-    socialHint: "Ikuti informasi terbaru atau hubungi panitia.",
+    socialHint: "Ikuti kabar terbaru atau ngobrol langsung dengan panitia.",
     policies: "Kebijakan",
     policyText:
-      "Ketentuan pengembalian dana, pemindahan tiket, dan aksesibilitas menunggu konfirmasi resmi penyelenggara.",
+      "Detail soal pengembalian dana, pemindahan tiket, dan aksesibilitas akan diumumkan panitia sebelum acara.",
     donate: "Donasi",
     donateText:
-      "Donasi dicatat terpisah dari pembelian tiket dan diverifikasi sebelum diakui.",
-    donateAction: "Lihat donasi",
+      "Kontribusi diproses terpisah dari tiket agar semuanya tetap jelas dan mudah dilacak.",
+    donateAction: "Pilih kontribusi",
     account: "Claim Ticket",
+    manifesto: "Satu panggung untuk musik, iman, dan kepedulian.",
+    discover: "Jelajahi acara",
   },
   en: {
     by: "By",
@@ -91,6 +93,8 @@ const messages = {
       "Donations are recorded separately from ticket purchases and verified before recognition.",
     donateAction: "View donations",
     account: "Claim Ticket",
+    manifesto: "One stage for music, faith, and care.",
+    discover: "Explore the event",
   },
 };
 
@@ -195,29 +199,6 @@ export default async function EventPage() {
                   Symphony of Faith <ArrowUpRight size={14} />
                 </a>
               </p>
-              <div className="event-facts">
-                <div>
-                  <CalendarDays size={19} />
-                  <span>
-                    <small>{t.date}</small>
-                    <strong>{formatEventDate(locale)}</strong>
-                  </span>
-                </div>
-                <div>
-                  <Clock3 size={19} />
-                  <span>
-                    <small>{t.time}</small>
-                    <strong>19:00–22:00 WIB</strong>
-                  </span>
-                </div>
-                <div>
-                  <MapPin size={19} />
-                  <span>
-                    <small>{t.venue}</small>
-                    <strong>Tiara Convention Hall, Medan</strong>
-                  </span>
-                </div>
-              </div>
               <div className="event-actions">
                 <a className="event-cta" href="#tickets">
                   {t.tickets}
@@ -225,6 +206,36 @@ export default async function EventPage() {
                 <ShareButton locale={locale} />
               </div>
             </div>
+            <aside className="event-facts" aria-label={t.discover}>
+              <div>
+                <CalendarDays size={19} />
+                <span>
+                  <small>{t.date}</small>
+                  <strong>{formatEventDate(locale)}</strong>
+                </span>
+              </div>
+              <div>
+                <Clock3 size={19} />
+                <span>
+                  <small>{t.time}</small>
+                  <strong>19:00–22:00 WIB</strong>
+                </span>
+              </div>
+              <div>
+                <MapPin size={19} />
+                <span>
+                  <small>{t.venue}</small>
+                  <strong>Tiara Convention Hall, Medan</strong>
+                </span>
+              </div>
+            </aside>
+          </section>
+          <section className="event-manifesto" aria-label={t.discover}>
+            <p>{t.manifesto}</p>
+            <a href="#tickets">
+              <span>{t.discover}</span>
+              <ArrowUpRight aria-hidden="true" size={18} />
+            </a>
           </section>
           <section id="tickets" className="event-tickets product-section">
             <div className="product-section-intro">

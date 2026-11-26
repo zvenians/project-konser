@@ -170,6 +170,8 @@
     grid-template-columns: 1fr;
   }
 }
+
+
 .event-backdrop {
   position: absolute;
   inset: 0 0 auto;
@@ -2214,5 +2216,407 @@
   ):active {
     transform: scale(0.98);
     transition-duration: 100ms;
+  }
+}
+
+/* Homepage composition — cinematic editorial, tactile across screen sizes. */
+.event-container {
+  width: min(1320px, calc(100% - 56px));
+}
+
+.event-breadcrumb {
+  padding: 18px 2px 24px;
+  color: color-mix(in srgb, var(--brand-cream) 78%, transparent);
+}
+
+.event-hero {
+  min-height: min(780px, calc(100svh - 118px));
+  align-items: end;
+  margin-bottom: 0;
+  border: 0;
+  border-radius: 44px 12px 44px 12px;
+  background: var(--brand-charcoal);
+  box-shadow: 0 34px 100px color-mix(in srgb, var(--brand-charcoal) 88%, transparent);
+}
+
+.event-cover {
+  inset: 18px 18px 18px 29%;
+  border-radius: 22px 6px 34px 8px;
+}
+
+.event-cover img {
+  object-position: 58% center;
+  transform: scale(1.015);
+  transition: transform 900ms cubic-bezier(.22,.8,.22,1), filter 500ms ease;
+}
+
+.event-hero:hover .event-cover img {
+  transform: scale(1.035);
+}
+
+.event-cover::before {
+  z-index: 1;
+  background: color-mix(in srgb, var(--brand-red) 13%, transparent);
+  mix-blend-mode: multiply;
+}
+
+.event-cover::after {
+  background:
+    linear-gradient(90deg, var(--brand-charcoal) 0%, color-mix(in srgb, var(--brand-charcoal) 72%, transparent) 25%, transparent 64%),
+    linear-gradient(0deg, color-mix(in srgb, var(--brand-charcoal) 72%, transparent), transparent 52%);
+}
+
+.event-identity {
+  width: min(650px, 58%);
+  padding: 0 0 52px 48px;
+  text-shadow: 0 3px 24px color-mix(in srgb, var(--brand-charcoal) 80%, transparent);
+}
+
+.event-type {
+  display: inline-flex;
+  padding: 8px 11px;
+  border-left: 2px solid var(--brand-gold);
+  color: var(--brand-cream);
+  background: color-mix(in srgb, var(--brand-charcoal) 78%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.event-identity h1 {
+  max-width: 620px;
+  margin: 18px 0 15px;
+  font-size: clamp(3.7rem, 8.5vw, 8rem);
+  line-height: .78;
+  letter-spacing: -.085em;
+  text-transform: none;
+}
+
+.event-byline {
+  font-size: 14px;
+  color: color-mix(in srgb, var(--brand-cream) 68%, var(--brand-sage));
+}
+
+.event-actions {
+  margin-top: 26px;
+}
+
+.event-actions .event-cta {
+  min-height: 50px;
+  padding-inline: 25px;
+  border-radius: 4px 15px 4px 15px;
+  color: var(--brand-cream);
+  background: var(--brand-red);
+}
+
+.event-actions .share-button {
+  min-height: 50px;
+  border-radius: 15px 4px 15px 4px;
+  border-color: color-mix(in srgb, var(--brand-cream) 28%, transparent);
+  color: var(--brand-cream);
+  background: color-mix(in srgb, var(--brand-charcoal) 72%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.event-facts {
+  position: absolute;
+  z-index: 4;
+  right: 34px;
+  bottom: 34px;
+  width: min(330px, 30%);
+  padding: 18px 22px;
+  border: 1px solid color-mix(in srgb, var(--brand-charcoal) 14%, transparent);
+  border-radius: 6px 24px 6px 24px;
+  color: var(--brand-charcoal);
+  background: color-mix(in srgb, var(--brand-cream) 94%, transparent);
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--brand-charcoal) 45%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.event-facts > div {
+  border-color: color-mix(in srgb, var(--brand-charcoal) 14%, transparent);
+}
+.event-facts svg,
+.event-facts small {
+  color: color-mix(in srgb, var(--brand-charcoal) 64%, var(--brand-sage));
+}
+.event-facts strong {
+  color: var(--brand-charcoal);
+}
+
+.event-manifesto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  padding: 68px 3% 90px 10%;
+}
+.event-manifesto p {
+  max-width: 870px;
+  margin: 0;
+  color: var(--brand-cream);
+  font-size: clamp(2.2rem, 5.5vw, 5.2rem);
+  line-height: .98;
+  letter-spacing: -.06em;
+}
+.event-manifesto a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--brand-gold);
+  color: var(--brand-gold);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.product-section {
+  position: relative;
+  padding-top: 86px;
+}
+.product-section-intro {
+  display: grid;
+  grid-template-columns: minmax(250px, .75fr) minmax(300px, 1fr);
+  align-items: end;
+  max-width: none;
+  margin-bottom: 34px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-cream) 13%, transparent);
+}
+.product-section-intro .eyebrow {
+  grid-column: 1 / -1;
+}
+.product-section-intro h2 {
+  margin: 12px 0 0;
+  font-size: clamp(2.6rem, 5vw, 5rem);
+  line-height: .92;
+}
+.product-section-intro > p:last-child {
+  max-width: 520px;
+  justify-self: end;
+  color: color-mix(in srgb, var(--brand-cream) 66%, var(--brand-sage));
+  font-size: 16px;
+}
+
+.picker-row.selected {
+  color: var(--brand-cream);
+  background: color-mix(in srgb, var(--brand-sage) 22%, var(--brand-charcoal));
+  border-color: var(--brand-gold);
+  box-shadow:
+    0 20px 44px color-mix(in srgb, var(--brand-charcoal) 48%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-gold) 42%, transparent) inset;
+}
+.picker-row.selected::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--brand-gold) 28%, transparent);
+  border-radius: 12px 3px 12px 12px;
+}
+.picker-row.selected p {
+  color: color-mix(in srgb, var(--brand-cream) 68%, var(--brand-sage));
+}
+.picker-row.selected .info-button {
+  color: var(--brand-gold);
+}
+.picker-row.selected .quantity-control button {
+  color: var(--brand-charcoal);
+  background: var(--brand-gold);
+  border-color: var(--brand-gold);
+}
+
+#livestream.product-section {
+  margin-top: 54px;
+  padding: 74px 54px 64px;
+  border-radius: 48px 12px 48px 12px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-sage) 14%, var(--brand-charcoal)), var(--brand-charcoal));
+}
+
+.contribution-section {
+  position: relative;
+  margin: 96px 0 76px;
+  padding: 68px 54px;
+  color: var(--brand-charcoal);
+  border-radius: 12px 52px 12px 52px;
+  background: var(--brand-cream);
+  box-shadow: 0 30px 90px color-mix(in srgb, var(--brand-charcoal) 48%, transparent);
+}
+.contribution-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 10%;
+  width: 22%;
+  height: 9px;
+  background: var(--brand-red);
+}
+.contribution-section .product-section-intro {
+  grid-template-columns: minmax(280px, .8fr) minmax(300px, 1fr);
+  border-color: color-mix(in srgb, var(--brand-charcoal) 18%, transparent);
+}
+.contribution-section .product-section-intro > p:last-child {
+  color: color-mix(in srgb, var(--brand-charcoal) 72%, var(--brand-sage));
+}
+.contribution-tier-grid {
+  gap: 14px;
+  margin: 38px 0 34px;
+}
+.contribution-tier {
+  min-height: 142px;
+  padding: 24px;
+  color: var(--brand-cream);
+  background: var(--brand-charcoal);
+  border-color: color-mix(in srgb, var(--brand-charcoal) 16%, transparent);
+  transition: transform 240ms cubic-bezier(.2,.8,.2,1), border-radius 240ms ease, background 240ms ease, color 240ms ease;
+}
+.contribution-tier:nth-child(2),
+.contribution-tier:nth-child(5) {
+  color: var(--brand-charcoal);
+  background: var(--brand-sage);
+}
+.contribution-tier:nth-child(3) {
+  color: var(--brand-cream);
+  background: var(--brand-red);
+}
+.contribution-tier small {
+  color: currentColor;
+  opacity: .62;
+}
+.contribution-tier:hover {
+  color: var(--brand-charcoal);
+  background: var(--brand-gold);
+  border-radius: 6px 22px 6px 22px;
+  transform: translateY(-4px);
+}
+.contribution-section > .event-cta {
+  min-height: 50px;
+  border-radius: 4px 16px 4px 16px;
+  color: var(--brand-cream);
+  background: var(--brand-red);
+}
+
+@media (hover: hover) {
+  .picker-row.selected:hover {
+    color: var(--brand-cream);
+    background: color-mix(in srgb, var(--brand-sage) 30%, var(--brand-charcoal));
+  }
+}
+
+@media (max-width: 980px) {
+  .event-container {
+    width: min(100% - 32px, 1320px);
+  }
+  .event-hero {
+    min-height: 820px;
+  }
+  .event-cover {
+    inset: 14px;
+  }
+  .event-cover::after {
+    background: linear-gradient(0deg, var(--brand-charcoal) 4%, color-mix(in srgb, var(--brand-charcoal) 72%, transparent) 48%, transparent 78%);
+  }
+  .event-identity {
+    width: 76%;
+    padding: 0 0 238px 34px;
+  }
+  .event-facts {
+    right: 28px;
+    bottom: 28px;
+    left: 28px;
+    width: auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .event-facts > div {
+    border-bottom: 0;
+    border-right: 1px solid color-mix(in srgb, var(--brand-charcoal) 14%, transparent);
+  }
+  .event-facts > div:last-child {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .event-container {
+    width: calc(100% - 24px);
+  }
+  .event-breadcrumb {
+    padding-bottom: 16px;
+  }
+  .event-hero {
+    min-height: 790px;
+    border-radius: 26px 7px 26px 7px;
+  }
+  .event-cover {
+    inset: 8px;
+    border-radius: 20px 4px 20px 4px;
+  }
+  .event-cover img {
+    object-position: center 24%;
+  }
+  .event-identity {
+    width: 100%;
+    padding: 0 22px 292px;
+  }
+  .event-identity h1 {
+    font-size: clamp(3.2rem, 18vw, 5.2rem);
+    line-height: .83;
+  }
+  .event-actions {
+    flex-wrap: nowrap;
+  }
+  .event-actions > * {
+    flex: 1;
+  }
+  .event-facts {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 12px 17px;
+    border-radius: 5px 19px 5px 19px;
+  }
+  .event-facts > div,
+  .event-facts > div:last-child {
+    padding: 10px 0;
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-charcoal) 12%, transparent);
+  }
+  .event-facts > div:last-child {
+    border-bottom: 0;
+  }
+  .event-manifesto {
+    grid-template-columns: 1fr;
+    padding: 54px 8px 68px;
+  }
+  .event-manifesto p {
+    font-size: clamp(2.4rem, 12vw, 4rem);
+  }
+  .product-section {
+    padding-top: 58px;
+  }
+  .product-section-intro,
+  .contribution-section .product-section-intro {
+    grid-template-columns: 1fr;
+  }
+  .product-section-intro > p:last-child {
+    justify-self: start;
+    margin-top: 18px;
+  }
+  #livestream.product-section {
+    margin-inline: -4px;
+    padding: 44px 16px 42px;
+    border-radius: 28px 7px 28px 7px;
+  }
+  .contribution-section {
+    margin-inline: -4px;
+    padding: 46px 16px;
+    border-radius: 7px 30px 7px 30px;
+  }
+  .contribution-tier {
+    min-height: 124px;
   }
 }
