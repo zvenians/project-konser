@@ -4,7 +4,11 @@ export const event = {
   endsAt: "2027-02-07T22:00:00+07:00",
   timezone: "Asia/Jakarta",
   venue: "Tiara Convention Hall, Medan",
-  instagram: "https://www.instagram.com/symphonyoffaithconcert?cnvx=MWN3ZnViYmMwZWtuYw==",
+  instagram:
+    "https://www.instagram.com/symphonyoffaithconcert?cnvx=MWN3ZnViYmMwZWtuYw==",
+  facebook: "https://www.facebook.com/share/1LPN18YgF9/",
+  tiktok: "https://www.tiktok.com/@symphony.of.faith?_r=1&_t=ZS-9BiSLgIRiP2",
+  whatsapp: "https://wa.me/6282379219493",
 };
 
 export const venueClasses = [
@@ -37,10 +41,24 @@ export const contributionTiers = [
 /** @deprecated Use venueClasses or livestreamPackages for new code. */
 export const officialClasses = venueClasses;
 
-export function countdown(now: number, start = event.startsAt, end = event.endsAt) {
+export function countdown(
+  now: number,
+  start = event.startsAt,
+  end = event.endsAt,
+) {
   const seconds = Math.max(0, Math.floor((Date.parse(start) - now) / 1000));
   return {
-    phase: now >= Date.parse(end) ? "ended" : now >= Date.parse(start) ? "live" : "upcoming",
-    values: [Math.floor(seconds / 86400), Math.floor(seconds / 3600) % 24, Math.floor(seconds / 60) % 60, seconds % 60],
+    phase:
+      now >= Date.parse(end)
+        ? "ended"
+        : now >= Date.parse(start)
+          ? "live"
+          : "upcoming",
+    values: [
+      Math.floor(seconds / 86400),
+      Math.floor(seconds / 3600) % 24,
+      Math.floor(seconds / 60) % 60,
+      seconds % 60,
+    ],
   };
 }

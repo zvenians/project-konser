@@ -1,12 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  CalendarDays,
-  MapPin,
-  Clock3,
-  Share2,
-  ArrowUpRight,
-} from "lucide-react";
+import { CalendarDays, MapPin, Clock3, ArrowUpRight } from "lucide-react";
 import { TicketPicker, type TicketOption } from "@/components/ticket-picker";
 import { ShareButton } from "@/components/share-button";
 import { EventMotion } from "@/components/event-motion";
@@ -50,6 +44,8 @@ const messages = {
     directions: "Buka peta",
     organizer: "Penyelenggara",
     contact: "Instagram resmi",
+    social: "Kanal resmi",
+    socialHint: "Ikuti informasi terbaru atau hubungi panitia.",
     policies: "Kebijakan",
     policyText:
       "Ketentuan pengembalian dana, pemindahan tiket, dan aksesibilitas menunggu konfirmasi resmi penyelenggara.",
@@ -85,6 +81,8 @@ const messages = {
     directions: "Open map",
     organizer: "Organizer",
     contact: "Official Instagram",
+    social: "Official channels",
+    socialHint: "Follow the latest updates or contact the committee.",
     policies: "Policies",
     policyText:
       "Refund, ticket transfer, and accessibility terms are awaiting official organizer confirmation.",
@@ -302,15 +300,33 @@ export default async function EventPage() {
                 </a>
               </section>
               <section>
-                <h2>{t.organizer}</h2>
-                <strong>Symphony of Faith</strong>
-                <a
-                  href={event.instagram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t.contact} <ArrowUpRight size={15} />
-                </a>
+                <p className="eyebrow">{t.organizer}</p>
+                <h2>{t.social}</h2>
+                <p>{t.socialHint}</p>
+                <div className="official-socials">
+                  {[
+                    { code: "IG", label: "Instagram", href: event.instagram },
+                    { code: "FB", label: "Facebook", href: event.facebook },
+                    { code: "TT", label: "TikTok", href: event.tiktok },
+                    {
+                      code: "WA",
+                      label: "+62 823-7921-9493",
+                      href: event.whatsapp,
+                    },
+                  ].map((social) => (
+                    <a
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      key={social.code}
+                      aria-label={`${social.label} Symphony of Faith`}
+                    >
+                      <small>{social.code}</small>
+                      <span>{social.label}</span>
+                      <ArrowUpRight aria-hidden="true" size={15} />
+                    </a>
+                  ))}
+                </div>
               </section>
               <section>
                 <h2>{t.donate}</h2>
@@ -328,7 +344,7 @@ export default async function EventPage() {
           <span>© 2026 Symphony of Faith</span>
           <a href="/claim-ticket">{t.account}</a>
           <a href={event.instagram} target="_blank" rel="noopener noreferrer">
-            Instagram <Share2 size={14} />
+            Instagram <ArrowUpRight size={14} />
           </a>
         </div>
       </footer>
