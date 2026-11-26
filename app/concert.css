@@ -3277,3 +3277,21 @@ form[data-submitting="true"] button[type="submit"]::before {
     width: 100%;
   }
 }
+
+.checkout-list .quantity-control button {
+  color: var(--brand-cream);
+  background: var(--brand-charcoal);
+  border-color: var(--brand-charcoal);
+}
+.checkout-list .quantity-control button:disabled {
+  color: color-mix(in srgb, var(--brand-charcoal) 52%, var(--brand-sage));
+  background: color-mix(in srgb, var(--brand-sage) 28%, var(--brand-cream));
+  border-color: color-mix(in srgb, var(--brand-charcoal) 18%, transparent);
+}
+@media (hover: hover) {
+  .checkout-list .quantity-control button:not(:disabled):hover {
+    color: var(--brand-charcoal);
+    background: var(--brand-gold);
+    border-color: var(--brand-gold);
+  }
+}
