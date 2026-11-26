@@ -1655,6 +1655,9 @@
 .contribution-section h2 {
   color: var(--brand-charcoal);
 }
+.contribution-section .product-section-intro > p:last-child {
+  color: color-mix(in srgb, var(--brand-charcoal) 78%, var(--brand-sage));
+}
 .contribution-tier-grid,
 .contribution-tier {
   border-color: color-mix(in srgb, var(--brand-charcoal) 22%, transparent);
