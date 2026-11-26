@@ -2620,3 +2620,25 @@
     min-height: 124px;
   }
 }
+
+/* Selected ticket stays tactile without relying on hover. */
+.picker-row.active.selected,
+.picker-row.active.selected:hover {
+  color: var(--brand-cream);
+  background: color-mix(in srgb, var(--brand-sage) 22%, var(--brand-charcoal));
+  border-color: var(--brand-gold);
+  box-shadow:
+    0 20px 44px color-mix(in srgb, var(--brand-charcoal) 48%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-gold) 42%, transparent) inset;
+}
+.picker-row.active.selected p {
+  color: color-mix(in srgb, var(--brand-cream) 68%, var(--brand-sage));
+}
+.picker-row.active.selected .info-button {
+  color: var(--brand-gold);
+}
+.picker-row.active.selected .quantity-control button {
+  color: var(--brand-charcoal);
+  background: var(--brand-gold);
+  border-color: var(--brand-gold);
+}
