@@ -7,14 +7,29 @@
 
 :root {
   color-scheme: dark;
-  --paper: #1b1b1d;
-  --ink: #f6f5f2;
-  --surface: #242426;
-  --muted: #aaa9a8;
-  --line: #3d3d3f;
-  --forest: #243d31;
-  --gold: #c8a665;
-  --ivory: #f6f5f2;
+  --brand-charcoal: #121212;
+  --brand-red: #8b0000;
+  --brand-sage: #8f9e8b;
+  --brand-cream: #f5f5dc;
+  --brand-gold: #d4af37;
+  --paper: var(--brand-charcoal);
+  --ink: var(--brand-cream);
+  --surface: color-mix(in srgb, var(--brand-cream) 7%, var(--brand-charcoal));
+  --surface-raised: color-mix(
+    in srgb,
+    var(--brand-cream) 11%,
+    var(--brand-charcoal)
+  );
+  --muted: color-mix(in srgb, var(--brand-sage) 76%, var(--brand-cream));
+  --line: color-mix(in srgb, var(--brand-cream) 20%, transparent);
+  --forest: color-mix(in srgb, var(--brand-sage) 32%, var(--brand-charcoal));
+  --gold: var(--brand-gold);
+  --ivory: var(--brand-cream);
+  --danger: var(--brand-red);
+  --success: var(--brand-sage);
+  --motion-fast: 180ms;
+  --motion-standard: 240ms;
+  --motion-modal: 320ms;
   --font-body: "Manrope Variable", "Figtree Variable", sans-serif;
 }
 * {
@@ -39,8 +54,8 @@ body {
   justify-content: center;
   gap: 12px;
   padding: 7px 18px;
-  background: #f7c94b;
-  color: #171719;
+  background: var(--brand-gold);
+  color: var(--brand-charcoal);
   font-size: 12px;
   line-height: 1.25;
   text-align: center;
@@ -237,12 +252,54 @@ img {
 .record button {
   min-height: 42px;
   padding: 9px 15px;
-  color: #171717;
-  background: #fff;
-  border: 1px solid #fff;
+  color: var(--brand-cream);
+  background: var(--brand-red);
+  border: 1px solid var(--brand-red);
   border-radius: 8px;
   font-size: 0.81rem;
   font-weight: 800;
+}
+
+/* Official Symphony of Faith 60/30/10 interaction system. */
+:is(button, a, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(input, select, textarea):focus-visible {
+  border-color: var(--brand-gold) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-gold) 28%, transparent);
+}
+
+button,
+[role="button"] {
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-standard) ease,
+    transform var(--motion-fast) ease;
+}
+
+button:active:not(:disabled),
+[role="button"]:active {
+  transform: scale(0.98);
+}
+
+dialog,
+[role="dialog"] {
+  overscroll-behavior: contain;
+}
+
+@media (hover: hover) {
+  .panel button:not(:disabled):hover,
+  .verify-form button:not(:disabled):hover,
+  .payment-box button:not(:disabled):hover,
+  .record button:not(:disabled):hover {
+    color: var(--brand-charcoal);
+    background: var(--brand-gold);
+    border-color: var(--brand-gold);
+    transform: translateY(-2px);
+  }
 }
 .secondary-button {
   min-height: 42px;
