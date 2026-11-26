@@ -1662,8 +1662,63 @@
 .contribution-tier {
   color: var(--brand-charcoal);
 }
+.contribution-tier {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 132px;
+  padding: 24px;
+  background: color-mix(in srgb, var(--brand-cream) 18%, transparent);
+  transition:
+    color var(--motion-standard) ease,
+    background-color var(--motion-standard) ease,
+    border-color var(--motion-standard) ease,
+    box-shadow var(--motion-standard) ease,
+    transform var(--motion-standard) ease;
+}
+.contribution-tier small {
+  align-self: start;
+  padding-top: 3px;
+  color: color-mix(in srgb, var(--brand-charcoal) 52%, var(--brand-sage));
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+.contribution-tier > span {
+  display: grid;
+  gap: 9px;
+}
+.contribution-tier b {
+  font-size: clamp(15px, 1.6vw, 19px);
+  line-height: 1.22;
+}
+.contribution-tier strong {
+  color: color-mix(in srgb, var(--brand-charcoal) 78%, var(--brand-red));
+  font-size: clamp(17px, 2vw, 23px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+}
+.contribution-tier > svg {
+  color: color-mix(in srgb, var(--brand-charcoal) 64%, var(--brand-sage));
+  transition:
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
 .selected-contribution {
   color: var(--brand-charcoal);
+}
+
+.event-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--brand-red) 34%, transparent);
+  mix-blend-mode: color;
+}
+.event-cover img {
+  filter: saturate(0.78) contrast(1.06) brightness(0.9);
 }
 
 .ticket-dialog {
@@ -1775,6 +1830,14 @@
   .contribution-tier:hover {
     color: var(--brand-charcoal);
     background: var(--brand-gold);
+    border-color: var(--brand-gold);
+    box-shadow: 0 16px 32px
+      color-mix(in srgb, var(--brand-charcoal) 18%, transparent);
+    transform: translateY(-3px);
+  }
+  .contribution-tier:hover > svg {
+    color: var(--brand-charcoal);
+    transform: translate(2px, -2px);
   }
   .event-cover:hover img {
     transform: scale(1.03);
@@ -1809,6 +1872,78 @@
   button,
   a {
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .contribution-section {
+    margin-inline: 0;
+    padding: 30px 20px 24px;
+    border: 0;
+  }
+  .contribution-section .product-section-intro {
+    margin-bottom: 24px;
+  }
+  .contribution-section .product-section-intro > p:last-child {
+    color: color-mix(in srgb, var(--brand-charcoal) 72%, var(--brand-sage));
+  }
+  .contribution-tier-grid {
+    gap: 10px;
+    margin: 24px 0;
+    border: 0;
+  }
+  .contribution-tier {
+    min-height: 104px;
+    padding: 18px 16px;
+    border: 1px solid color-mix(in srgb, var(--brand-charcoal) 18%, transparent);
+    background: color-mix(in srgb, var(--brand-cream) 34%, transparent);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--brand-cream) 24%, transparent)
+      inset;
+  }
+  .contribution-tier b {
+    font-size: 15px;
+  }
+  .contribution-tier strong {
+    font-size: 20px;
+  }
+  .contribution-section > .event-cta {
+    width: 100%;
+  }
+  .mobile-cart-bar {
+    z-index: 60;
+    border-color: color-mix(in srgb, var(--brand-gold) 32%, transparent);
+    background: color-mix(in srgb, var(--brand-charcoal) 96%, transparent);
+    box-shadow: 0 -16px 40px
+      color-mix(in srgb, var(--brand-charcoal) 72%, transparent);
+    backdrop-filter: blur(18px);
+  }
+  .mobile-cart-bar span {
+    color: var(--brand-sage);
+  }
+  .mobile-cart-bar strong {
+    color: var(--brand-cream);
+  }
+  .mobile-cart-bar a {
+    color: var(--brand-cream);
+    background: var(--brand-red);
+    border: 1px solid color-mix(in srgb, var(--brand-gold) 28%, transparent);
+  }
+  .event-cover::before {
+    background: color-mix(in srgb, var(--brand-red) 28%, transparent);
+  }
+  .event-cover::after {
+    background:
+      linear-gradient(
+        0deg,
+        var(--brand-charcoal) 0%,
+        color-mix(in srgb, var(--brand-red) 66%, transparent) 38%,
+        transparent 72%
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--brand-charcoal) 38%, transparent),
+        transparent 72%
+      );
   }
 }
 @media (max-width: 600px) {

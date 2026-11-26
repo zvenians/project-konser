@@ -11,7 +11,12 @@ import { TicketPicker, type TicketOption } from "@/components/ticket-picker";
 import { ShareButton } from "@/components/share-button";
 import { EventMotion } from "@/components/event-motion";
 import { db } from "@/lib/db";
-import { contributionTiers, event, livestreamPackages, venueClasses } from "@/lib/event";
+import {
+  contributionTiers,
+  event,
+  livestreamPackages,
+  venueClasses,
+} from "@/lib/event";
 import { getLocale, formatEventDate, translate } from "@/lib/i18n";
 import { settingValue } from "@/lib/settings";
 import { demoModeEnabled } from "@/lib/demo-config";
@@ -26,11 +31,14 @@ const messages = {
     venue: "Lokasi",
     tickets: "Lihat tiket",
     venueTickets: "Tiket venue",
-    venueTicketsText: "Pilih kursi untuk hadir langsung di Tiara Convention Hall.",
+    venueTicketsText:
+      "Pilih kursi untuk hadir langsung di Tiara Convention Hall.",
     livestreamPackages: "Paket livestream",
-    livestreamPackagesText: "Nikmati siaran konser dari mana saja dengan akses digital terpisah.",
+    livestreamPackagesText:
+      "Nikmati siaran konser dari mana saja dengan akses digital terpisah.",
     contributionProgram: "Program kontribusi",
-    contributionProgramText: "Dukung karya dan pelayanan melalui kontribusi yang terpisah dari pembelian tiket.",
+    contributionProgramText:
+      "Dukung karya dan pelayanan melalui kontribusi yang terpisah dari pembelian tiket.",
     share: "Bagikan",
     about: "Tentang acara",
     aboutText:
@@ -58,11 +66,14 @@ const messages = {
     venue: "Venue",
     tickets: "View tickets",
     venueTickets: "Venue tickets",
-    venueTicketsText: "Choose your seat for an in-person experience at Tiara Convention Hall.",
+    venueTicketsText:
+      "Choose your seat for an in-person experience at Tiara Convention Hall.",
     livestreamPackages: "Livestream packages",
-    livestreamPackagesText: "Join the concert from anywhere with separate digital access.",
+    livestreamPackagesText:
+      "Join the concert from anywhere with separate digital access.",
     contributionProgram: "Contribution program",
-    contributionProgramText: "Support the work and ministry through a contribution separate from ticket purchases.",
+    contributionProgramText:
+      "Support the work and ministry through a contribution separate from ticket purchases.",
     share: "Share",
     about: "About the event",
     aboutText:
@@ -103,28 +114,42 @@ export default async function EventPage() {
   }>(settings[0]?.value);
   const paymentReady =
     demo || Boolean(payment?.bank && payment.account && payment.holder);
-  const optionsFor = (mode: "VENUE" | "LIVESTREAM", catalogue: ReadonlyArray<{ name: string; price: number; capacity?: number }>): TicketOption[] =>
+  const optionsFor = (
+    mode: "VENUE" | "LIVESTREAM",
+    catalogue: ReadonlyArray<{
+      name: string;
+      price: number;
+      capacity?: number;
+    }>,
+  ): TicketOption[] =>
     catalogue.map((item) => {
-        const row = classes.find(
-          (c) => c.name === item.name && c.mode === mode,
-        );
-        const capacity = mode === "VENUE" ? item.capacity ?? 0 : row?.purchase_limit === null ? null : Number(row?.purchase_limit);
-        const available = mode === "VENUE"
+      const row = classes.find((c) => c.name === item.name && c.mode === mode);
+      const capacity =
+        mode === "VENUE"
+          ? (item.capacity ?? 0)
+          : row?.purchase_limit === null
+            ? null
+            : Number(row?.purchase_limit);
+      const available =
+        mode === "VENUE"
           ? Number(row?.venue_available ?? 0)
-          : capacity === null ? 2147483647 : Math.max(0, capacity - Number(row?.stream_reserved ?? 0));
-        return {
-          id: String(row?.id ?? ""),
-          name: item.name,
-          mode,
-          price: Number(row?.price ?? item.price),
-          capacity,
-          available,
-          active:
-            paymentReady &&
-            Boolean(row?.sale_enabled) &&
-            available > 0 && (mode === "VENUE" || Boolean(row?.streaming_ready)),
-          soldOut: paymentReady && Boolean(row?.sale_enabled) && available === 0,
-        };
+          : capacity === null
+            ? 2147483647
+            : Math.max(0, capacity - Number(row?.stream_reserved ?? 0));
+      return {
+        id: String(row?.id ?? ""),
+        name: item.name,
+        mode,
+        price: Number(row?.price ?? item.price),
+        capacity,
+        available,
+        active:
+          paymentReady &&
+          Boolean(row?.sale_enabled) &&
+          available > 0 &&
+          (mode === "VENUE" || Boolean(row?.streaming_ready)),
+        soldOut: paymentReady && Boolean(row?.sale_enabled) && available === 0,
+      };
     });
   const venueOptions = optionsFor("VENUE", venueClasses);
   const streamOptions = optionsFor("LIVESTREAM", livestreamPackages);
@@ -209,7 +234,11 @@ export default async function EventPage() {
               <h2>{t.venueTickets}</h2>
               <p>{t.venueTicketsText}</p>
             </div>
-            <TicketPicker options={venueOptions} cartOptions={[...venueOptions, ...streamOptions]} locale={locale} />
+            <TicketPicker
+              options={venueOptions}
+              cartOptions={[...venueOptions, ...streamOptions]}
+              locale={locale}
+            />
           </section>
           <section id="livestream" className="event-tickets product-section">
             <div className="product-section-intro">
@@ -217,7 +246,12 @@ export default async function EventPage() {
               <h2>{t.livestreamPackages}</h2>
               <p>{t.livestreamPackagesText}</p>
             </div>
-            <TicketPicker options={streamOptions} cartOptions={[...venueOptions, ...streamOptions]} showCart={false} locale={locale} />
+            <TicketPicker
+              options={streamOptions}
+              cartOptions={[...venueOptions, ...streamOptions]}
+              showCart={false}
+              locale={locale}
+            />
           </section>
           <section id="contributions" className="contribution-section">
             <div className="product-section-intro">
@@ -226,14 +260,24 @@ export default async function EventPage() {
               <p>{t.contributionProgramText}</p>
             </div>
             <div className="contribution-tier-grid">
-              {contributionTiers.map((tier) => (
-                <Link href={`/donate?tier=${encodeURIComponent(tier.name)}`} className="contribution-tier" key={tier.name}>
-                  <span>{tier.name}</span>
-                  <strong>Rp{tier.price.toLocaleString("id-ID")}</strong>
+              {contributionTiers.map((tier, index) => (
+                <Link
+                  href={`/donate?tier=${encodeURIComponent(tier.name)}`}
+                  className="contribution-tier"
+                  key={tier.name}
+                >
+                  <small>{String(index + 1).padStart(2, "0")}</small>
+                  <span>
+                    <b>{tier.name}</b>
+                    <strong>Rp{tier.price.toLocaleString("id-ID")}</strong>
+                  </span>
+                  <ArrowUpRight aria-hidden="true" size={20} />
                 </Link>
               ))}
             </div>
-            <Link href="/donate" className="event-cta">{t.donateAction}</Link>
+            <Link href="/donate" className="event-cta">
+              {t.donateAction}
+            </Link>
           </section>
           <div className="event-lower">
             <section id="information" className="event-info">
